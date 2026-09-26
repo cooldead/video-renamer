@@ -138,3 +138,7 @@ Press **Delete**, use **Edit → Delete…**, or right-click → **Delete…** t
 ```sh
 python3 -m unittest
 ```
+
+## License
+
+MIT, see [LICENSE](LICENSE). Disc data comes from [TheDiscDB](https://thediscdb.com); MakeMKV, mpv and MKVToolNix are separate programs under their own licenses.
