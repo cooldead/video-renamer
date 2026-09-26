@@ -261,10 +261,26 @@ def preferred_language(settings_file: Path = Path.home() / ".MakeMKV" / "setting
     return match.group(1) if match else "eng"
 
 
-def default_selected(track: Track, favorite: str, mode: str = "makemkv") -> bool:
+def parse_languages(text: str) -> tuple[list[str], list[str]]:
+    """Language codes from text like "eng, jpn" or "eng jpn": (valid 3-letter
+    codes, lower case and without duplicates, in order; anything else)."""
+    valid, invalid = [], []
+    for part in re.split(r"[\s,;]+", text.strip()):
+        if not part:
+            continue
+        code = part.lower()
+        if re.fullmatch(r"[a-z]{3}", code):
+            if code not in valid:
+                valid.append(code)
+        else:
+            invalid.append(part)
+    return valid, invalid
+
+
+def default_selected(track: Track, favorites: str | list[str], mode: str = "makemkv") -> bool:
     """Whether a track starts ticked. mode "makemkv" works like MakeMKV's
-    default selection: all video, plus audio/subtitles in the preferred
-    language or without a language. "all" ticks everything, "video" only video."""
+    default selection: all video, plus audio/subtitles in one of the preferred
+    languages or without a language. "all" ticks everything, "video" only video."""
     if track.kind == "video":
         return True
     if mode == "all":
@@ -272,7 +288,10 @@ def default_selected(track: Track, favorite: str, mode: str = "makemkv") -> bool
     if mode == "video":
         return False
     if track.kind in ("audio", "subtitle"):
-        return track.language in ("", favorite)
+        if isinstance(favorites, str):
+            favorites = [favorites]
+        wanted = {normalize_language(code) for code in favorites}
+        return not track.language or normalize_language(track.language) in wanted
     return False
 
 

@@ -63,7 +63,16 @@ class ParseInfoTest(unittest.TestCase):
         self.assertIn(tracks[1], picked)                                      # English TrueHD
         self.assertNotIn(next(t for t in tracks if t.language == "fra"), picked)
         self.assertTrue(all(makemkv.default_selected(t, "eng", "all") for t in tracks))
+        both = [t.language for t in tracks if t.kind != "video" and makemkv.default_selected(t, ["eng", "jpn"])]
+        self.assertEqual(set(both), {"eng", "jpn"})
+        french = next(t for t in tracks if t.language == "fra")
+        self.assertTrue(makemkv.default_selected(french, ["fre"]))   # old-style code works too
         self.assertEqual([t.kind for t in tracks if makemkv.default_selected(t, "eng", "video")], ["video"])
+
+    def test_parse_languages(self):
+        self.assertEqual(makemkv.parse_languages("eng, JPN  fre;eng"), (["eng", "jpn", "fre"], []))
+        self.assertEqual(makemkv.parse_languages("english, jp"), ([], ["english", "jp"]))
+        self.assertEqual(makemkv.parse_languages(""), ([], []))
 
 
 class ProgressTest(unittest.TestCase):

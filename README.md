@@ -21,7 +21,7 @@ sudo pacman -S mkvtoolnix-cli rsync
 1. **Rip Disc… (Ctrl+D).**
    - The drive is found and the disc scanned automatically.
    - As in MakeMKV, you get every title with its length, chapters and size. Expand a title to tick its video, audio and subtitle tracks.
-   - Tracks start ticked the MakeMKV way: video, plus audio and subtitles in your MakeMKV preferred language or with no language.
+   - Tracks start ticked the MakeMKV way: video, plus audio and subtitles in your preferred languages (Settings → MakeMKV, e.g. `eng, jpn`) or with no language.
    - "Min. title length" hides short titles (MakeMKV's minimum title length).
    - Rips go to `~/Videos/<disc title>` by default.
    - The window runs in the background with progress. When it's done, the folder opens in the renamer.
@@ -127,7 +127,7 @@ Press **Delete**, use **Edit → Delete…**, or right-click → **Delete…** t
 - **MakeMKV:**
   - The locations of `makemkvcon` and `mkvmerge`. "Check programs" shows their versions.
   - Minimum title length and read cache size.
-  - Preferred language. Leave it empty to use MakeMKV's own setting.
+  - Preferred languages: 3-letter codes, e.g. `eng, jpn`. Audio and subtitle tracks in any of them start ticked. Leave it empty to use MakeMKV's own setting.
   - Which tracks start ticked: like MakeMKV, all tracks, or video only.
 - **Export:**
   - NAS destinations (output). The first one is the default, and the one you export to moves to the top.

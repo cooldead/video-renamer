@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
+from . import makemkv
 from . import settings as app_settings
 
 PRETICK_CHOICES = [
@@ -146,7 +147,10 @@ class SettingsDialog(QDialog):
         self.cache.setValue(get("makemkv_cache_mb"))
         self.language = QLineEdit(get("makemkv_language"))
         self.language.setPlaceholderText("MakeMKV's own setting (e.g. eng)")
-        self.language.setMaxLength(3)
+        self.language.setToolTip("3-letter language codes, separated by commas or spaces, e.g. eng, jpn.\n"
+                                 "Audio and subtitle tracks in any of these languages start ticked.")
+        self.language_problem = QLabel()
+        self.language.textChanged.connect(self._check_languages)
         self.pretick = QComboBox()
         for value, text in PRETICK_CHOICES:
             self.pretick.addItem(text, value)
@@ -158,7 +162,8 @@ class SettingsDialog(QDialog):
         form.addRow("", self.tool_status)
         form.addRow("Minimum title length", self.min_length)
         form.addRow("Read cache", self.cache)
-        form.addRow("Preferred language", self.language)
+        form.addRow("Preferred languages", self.language)
+        form.addRow("", self.language_problem)
         form.addRow("Tracks ticked at first", self.pretick)
         form.addRow("", QLabel("mkvmerge (package mkvtoolnix-cli) removes the tracks you untick after ripping."))
         tabs.addTab(makemkv_tab, QIcon.fromTheme("media-optical"), "MakeMKV")
@@ -199,6 +204,7 @@ class SettingsDialog(QDialog):
         main = QVBoxLayout(self)
         main.addWidget(tabs, 1)
         main.addWidget(box)
+        self._check_languages(self.language.text())
         self._check_tools()
 
     def _add_destination(self, path: str) -> None:
@@ -216,6 +222,16 @@ class SettingsDialog(QDialog):
         if row > 0:
             self.destinations.insertItem(0, self.destinations.takeItem(row))
             self.destinations.setCurrentRow(0)
+
+    def _check_languages(self, text: str) -> None:
+        valid, invalid = makemkv.parse_languages(text)
+        if invalid:
+            self.language_problem.setText(f"<span style='color:#d33'>Not a 3-letter language code: "
+                                          f"{', '.join(invalid)} (ignored)</span>")
+        elif valid:
+            self.language_problem.setText(f"Tracks in {', '.join(valid)} start ticked.")
+        else:
+            self.language_problem.setText("Uses MakeMKV's own preferred language.")
 
     def _check_tools(self) -> None:
         """Check the programs in the background so the window opens at once."""
@@ -281,7 +297,7 @@ class SettingsDialog(QDialog):
         put("mkvmerge_path", self.mkvmerge.text() or "mkvmerge")
         put("rip_min_length", self.min_length.value())
         put("makemkv_cache_mb", self.cache.value())
-        put("makemkv_language", self.language.text().strip().lower())
+        put("makemkv_language", ", ".join(makemkv.parse_languages(self.language.text())[0]))
         put("pretick", self.pretick.currentData())
         destinations = [self.destinations.item(i).text().strip() for i in range(self.destinations.count())]
         put("export_destinations", [d for d in destinations if d] or app_settings.DEFAULTS["export_destinations"])

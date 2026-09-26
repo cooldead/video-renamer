@@ -334,7 +334,8 @@ class RipDialog(QDialog):
         self.disc_label.setText(f"<b>{disc.name}</b> · {disc.kind} · {len(disc.titles)} titles")
         self.setWindowTitle(f"Rip Disc — {disc.name} ({self.device})")
         self.status.setText("Tick the titles and tracks to rip.")
-        favorite = app_settings.get(self.settings, "makemkv_language") or makemkv.preferred_language()
+        favorite = (makemkv.parse_languages(app_settings.get(self.settings, "makemkv_language"))[0]
+                    or [makemkv.preferred_language()])
         pretick = app_settings.get(self.settings, "pretick")
         self.tree.blockSignals(True)
         for title in disc.titles:
