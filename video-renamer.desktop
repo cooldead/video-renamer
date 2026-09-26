@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Video Renamer
+GenericName=Video File Renamer
+Comment=Preview video files and rename them
+Exec=/home/cooldead/Projects/video-renamer/run.sh %f
+Icon=video-x-generic
+Terminal=false
+Categories=AudioVideo;Video;Utility;
+MimeType=inode/directory;
