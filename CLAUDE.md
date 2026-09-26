@@ -62,4 +62,5 @@ python3 -m unittest        # unit tests (tests/, ~54), no GUI or network needed
 
 - Match the existing style: pure logic in modules without Qt, with unit tests. Dialogs are thin. Comments explain *why*.
 - The repository is **public**: https://github.com/cooldead/video-renamer (MIT). Never commit personal details: NAS addresses, drive serials, home paths beyond the desktop file, emails.
-- Releases: `gh release create vX.Y.Z --generate-notes`. The first release was v1.0.0 (2026-09-25).
+- Releases: `gh release create vX.Y.Z` with notes. So far: v1.0.0 (2026-09-25, first release) and v1.1.0 (2026-09-26, several exports copied one at a time). Bump the minor version for new features and the patch version for fixes.
+- **Logging:** after each change, add an entry to `docs/DEVELOPMENT_LOG.md`, and update this file if a design decision changes.

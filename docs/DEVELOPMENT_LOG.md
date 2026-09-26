@@ -100,6 +100,10 @@ How Video Renamer was built. It was developed with Claude Code in one long sessi
 - **Request:** with several movie folders selected, Export should open a prompt for each, but recommend moving one movie folder at a time.
 - **Built:** one Export window per selected folder, offset from each other, with a hint while several are open. Starting an export while another copies asks "Wait until it finishes (recommended)" or "Start now anyway". Waiting exports queue and start automatically, in order. There's also "Leave queue".
 - **Tested** with three folders and throttled rsync: never more than one copy at a time, finished in order, all verified.
+- **Along the way:** clarified with the user which button was meant. "Move" meant **Export to NAS**, the NAS copy, not Move to Folder.
+
+## 17. Release v1.1.0 (2026-09-26)
+- Released as v1.1.0: the multi-folder export queue, plus `CLAUDE.md` and this log. v1.0.0 was the first release (2026-09-25).
 
 ## Open items / ideas not done
 - **Whether the all-tracks profile rips every language** was confirmed on real rips (29/27 tracks). Removing tracks after a real multi-language rip has only been tested on short titles.
