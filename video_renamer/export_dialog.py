@@ -3,6 +3,7 @@ copy, and optionally delete the local folder afterwards."""
 
 from __future__ import annotations
 
+import itertools
 import shutil
 from pathlib import Path
 
@@ -18,17 +19,23 @@ from . import settings as app_settings
 from .rip_dialog import human_bytes
 
 MAX_RECENT = 8
+_queue_order = itertools.count()  # order in which exports joined the queue
 
 
 class ExportDialog(QDialog):
-    """Non-modal: copying 50+ GB takes a while."""
+    """Non-modal: copying 50+ GB takes a while. Several can be open (one per
+    folder); they copy one at a time by default, the others wait in a queue."""
 
     exported = Signal(object, bool)  # (local folder, whether it was deleted)
+    idle = Signal()                  # a copy ended or was stopped: the next queued export may start
 
-    def __init__(self, source: Path, settings: QSettings, release_folder, parent=None):
+    def __init__(self, source: Path, settings: QSettings, release_folder, parent=None, others=lambda: []):
         """release_folder(path) is called before the local folder is deleted
-        (so the window can stop playing a file from it)."""
+        (so the window can stop playing a file from it). others() returns the
+        other open Export windows."""
         super().__init__(parent)
+        self._others = others
+        self.queued_at: int | None = None  # set while waiting for another export
         self.setWindowTitle(f"Export “{source.name}”")
         self.resize(640, 300)
         self.source = source
@@ -60,6 +67,9 @@ class ExportDialog(QDialog):
         form.addRow("", self.target_label)
         form.addRow("", self.delete_after)
 
+        self.hint = QLabel()
+        self.hint.setWordWrap(True)
+        self.hint.setVisible(False)
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
         self.status = QLabel()
@@ -80,6 +90,7 @@ class ExportDialog(QDialog):
 
         layout = QVBoxLayout(self)
         layout.addLayout(form)
+        layout.addWidget(self.hint)
         layout.addWidget(self.progress)
         layout.addWidget(self.status)
         layout.addStretch(1)
@@ -115,20 +126,71 @@ class ExportDialog(QDialog):
             if self.target().exists():
                 text += "<br><span style='color:#c80'>This folder already exists on the NAS: files are merged, identical ones skipped.</span>"
             self.target_label.setText(text)
-        self.export_button.setEnabled(problem is None and self._process is None)
+        self.export_button.setEnabled(problem is None and self._process is None and self.queued_at is None)
 
     def _browse(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, "Copy into…", str(self._parent_folder()))
         if folder:
             self.destination.setCurrentText(folder)
 
+    # --- several exports -------------------------------------------------------
+
+    def is_running(self) -> bool:
+        return self._process is not None
+
+    def _other_windows(self) -> list["ExportDialog"]:
+        return [o for o in self._others() if o is not self]
+
+    def set_group_hint(self, open_windows: int) -> None:
+        """Shown while several Export windows are open."""
+        self.hint.setVisible(open_windows > 1)
+        self.hint.setText(f"<i>{open_windows} Export windows are open. Copying one folder at a time is "
+                          "recommended: several copies at once share the network and each gets slower. "
+                          "Start them all and they will wait in line.</i>")
+
+    def _ask_to_wait(self, running: "ExportDialog") -> str:
+        """"wait", "now" or "cancel"."""
+        box = QMessageBox(QMessageBox.Icon.Question, self.windowTitle(),
+                          f"“{running.source.name}” is still being copied.", parent=self)
+        box.setInformativeText("Copying one folder at a time is recommended. Wait, and this export starts "
+                               "automatically when the other one is done?")
+        wait = box.addButton("Wait until it finishes (recommended)", QMessageBox.ButtonRole.AcceptRole)
+        now = box.addButton("Start now anyway", QMessageBox.ButtonRole.DestructiveRole)
+        box.addButton(QMessageBox.StandardButton.Cancel)
+        box.setDefaultButton(wait)
+        box.exec()
+        return {wait: "wait", now: "now"}.get(box.clickedButton(), "cancel")
+
+    def _enqueue(self) -> None:
+        self.queued_at = next(_queue_order)
+        ahead = [o for o in self._other_windows() if o.is_running() or
+                 (o.queued_at is not None and o.queued_at < self.queued_at)]
+        self.status.setText(f"Waiting: starts automatically when {len(ahead)} export"
+                            f"{'s' if len(ahead) != 1 else ''} ahead of it {'are' if len(ahead) != 1 else 'is'} done. "
+                            "Press Stop to leave the queue.")
+        self._set_busy(True)
+
     # --- copying -----------------------------------------------------------
 
-    def start(self) -> None:
+    def start(self, from_queue: bool = False) -> None:
         problem = self._problem()
         if problem:
+            self.queued_at = None
+            self._set_busy(False)
             QMessageBox.warning(self, self.windowTitle(), problem)
+            self.idle.emit()  # let the next queued export go
             return
+        if not from_queue:
+            busy = [o for o in self._other_windows() if o.is_running() or o.queued_at is not None]
+            if busy:
+                running = next((o for o in busy if o.is_running()), busy[0])
+                choice = self._ask_to_wait(running)
+                if choice == "cancel":
+                    return
+                if choice == "wait":
+                    self._enqueue()
+                    return
+        self.queued_at = None
         destination = str(self._parent_folder())
         # The destination used moves to the top, so it's the default next time.
         recent = [destination] + [d for d in app_settings.get(self.settings, "export_destinations") if d != destination]
@@ -146,9 +208,11 @@ class ExportDialog(QDialog):
         process.start(export.RSYNC, export.rsync_args(self.source, self._parent_folder()))
 
     def _set_busy(self, busy: bool) -> None:
+        """busy = copying or waiting in the queue."""
         self.destination.setEnabled(not busy)
         self.delete_after.setEnabled(not busy)
         self.stop_button.setEnabled(busy)
+        self.stop_button.setText("Leave queue" if self.queued_at is not None else "Stop")
         self.export_button.setEnabled(not busy and self._problem() is None)
 
     def _read_output(self) -> None:
@@ -170,10 +234,17 @@ class ExportDialog(QDialog):
             self._process = None
             self._set_busy(False)
             QMessageBox.critical(self, self.windowTitle(), "Could not start rsync. Is it installed?")
+            self.idle.emit()
 
     def _finished(self, exit_code: int, exit_status) -> None:
         self._process = None
         self._set_busy(False)
+        try:
+            self._report_finished(exit_code, exit_status)
+        finally:
+            self.idle.emit()  # the next queued export may start now
+
+    def _report_finished(self, exit_code: int, exit_status) -> None:
         if exit_status != QProcess.ExitStatus.NormalExit or exit_code != 0:
             message = getattr(self, "_last_message", "")
             self.status.setText(f"<span style='color:#d33'>Copy failed (rsync exit code {exit_code}). {message}</span>")
@@ -201,6 +272,11 @@ class ExportDialog(QDialog):
         self.exported.emit(self.source, True)
 
     def stop(self) -> None:
+        if self.queued_at is not None:
+            self.queued_at = None
+            self._set_busy(False)
+            self.status.setText("Left the queue. Press Export to start it later.")
+            return
         if self._process is not None:
             self._process.finished.disconnect()
             self._process.kill()
@@ -208,8 +284,11 @@ class ExportDialog(QDialog):
             self._process = None
             self._set_busy(False)
             self.status.setText("Stopped. Starting the export again continues where it left off.")
+            self.idle.emit()
 
     def closeEvent(self, event) -> None:
+        if self.queued_at is not None:
+            self.stop()  # just leave the queue
         if self._process is not None:
             if QMessageBox.question(self, self.windowTitle(), "The copy is still running. Stop it and close?") \
                     != QMessageBox.StandardButton.Yes:

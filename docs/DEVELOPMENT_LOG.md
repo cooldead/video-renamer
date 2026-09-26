@@ -96,6 +96,11 @@ How Video Renamer was built. It was developed with Claude Code in one long sessi
 - **Desktop entry:** installed to `~/.local/share/applications` and `~/Desktop`. The `inode/directory` MimeType was removed so the app never takes over opening folders.
 - **License and release:** MIT license added, then the v1.0.0 release.
 
+## 16. Exporting several folders (2026-09-26)
+- **Request:** with several movie folders selected, Export should open a prompt for each, but recommend moving one movie folder at a time.
+- **Built:** one Export window per selected folder, offset from each other, with a hint while several are open. Starting an export while another copies asks "Wait until it finishes (recommended)" or "Start now anyway". Waiting exports queue and start automatically, in order. There's also "Leave queue".
+- **Tested** with three folders and throttled rsync: never more than one copy at a time, finished in order, all verified.
+
 ## Open items / ideas not done
 - **Whether the all-tracks profile rips every language** was confirmed on real rips (29/27 tracks). Removing tracks after a real multi-language rip has only been tested on short titles.
 - **The first two real rips (Indiana Jones, One Battle After Another)** still contain all their tracks; they were made before the matching fix.

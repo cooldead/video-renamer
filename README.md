@@ -50,6 +50,7 @@ sudo pacman -S mkvtoolnix-cli rsync
    - Uses `rsync`, with progress, speed and time left. A stopped export picks up where it left off.
    - Afterwards every file's size is checked on the NAS.
    - With "Delete the local folder after the copy has been checked" ticked (off by default), the local folder is removed only when that check passes.
+   - **Several folders:** select several movie folders and press Export to open one window per folder. Copying one folder at a time is recommended, because parallel copies share the network. If you start an export while another is copying, it asks **Wait until it finishes (recommended)** or **Start now anyway**. Waiting exports start automatically, in order. **Leave queue** takes one out of the line.
 
 ## Run
 

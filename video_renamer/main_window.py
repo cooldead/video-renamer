@@ -5,7 +5,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QFile, QFileSystemWatcher, QModelIndex, QObject, QSettings, Qt, QTimer, Signal
+from PySide6.QtCore import QEvent, QFile, QFileSystemWatcher, QModelIndex, QObject, QPoint, QSettings, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QDrag, QIcon, QKeySequence
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QCheckBox, QDialog, QFileDialog, QHBoxLayout, QHeaderView, QInputDialog, QLabel, QLineEdit,
@@ -135,6 +135,7 @@ class MainWindow(QMainWindow):
         # may depend on an earlier one (e.g. files renamed, then their folder).
         self.undo_stack: list[list[tuple[list[RenameOp], list[Path]]]] = []
         self._rip_dialogs: list[RipDialog] = []
+        self._export_dialogs: list[ExportDialog] = []
 
         self.model = VideoTreeModel(self)
         self.model.renameRequested.connect(self._on_inline_rename, Qt.ConnectionType.QueuedConnection)
@@ -613,7 +614,7 @@ class MainWindow(QMainWindow):
         discdb_item.setEnabled(self._export_source() is not None)
         export_item = menu.addAction(QIcon.fromTheme("document-export"), "Export to NAS…", self.export_folder)
         export_item.setShortcut(self.export_act.shortcut())
-        export_item.setEnabled(self._export_source() is not None)
+        export_item.setEnabled(bool(self._export_sources()))
         menu.addSeparator()
         delete = menu.addAction(QIcon.fromTheme("edit-delete"), "Delete…", self.delete_selected)
         delete.setShortcut(self.delete_act.shortcut())
@@ -767,15 +768,60 @@ class MainWindow(QMainWindow):
         path = self.current_path()
         return path if path in self.model.folders else None
 
+    def _export_sources(self) -> list[Path]:
+        """Selected folders (in tree order), or the current folder."""
+        selected = [p for p in self.table.dragged_paths() if p in self.model.folders]
+        if not selected and self._export_source() is not None:
+            selected = [self._export_source()]
+        order = {p: i for i, p in enumerate(index.data(PATH_ROLE) for index in self._walk())}
+        return sorted(selected, key=lambda p: order.get(p, 0))
+
     def export_folder(self) -> None:
-        source = self._export_source()
-        if source is None:
-            QMessageBox.information(self, APP_NAME, "Select the folder to export in the tree first.")
+        """One Export window per selected folder. They copy one at a time by
+        default: starting one while another copies offers to queue it."""
+        sources = self._export_sources()
+        if not sources:
+            QMessageBox.information(self, APP_NAME, "Select the folder(s) to export in the tree first.")
             return
-        dialog = ExportDialog(source, self.settings, self._release_folder, self)
-        dialog.exported.connect(self._on_exported)
-        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-        dialog.show()
+        self._export_dialogs = [d for d in self._export_dialogs if d.isVisible()]
+        opened = 0
+        for source in sources:
+            existing = next((d for d in self._export_dialogs if d.source == source), None)
+            if existing is not None:
+                existing.raise_()
+                continue
+            dialog = ExportDialog(source, self.settings, self._release_folder, self,
+                                  others=lambda: list(self._export_dialogs))
+            dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+            dialog.exported.connect(self._on_exported)
+            dialog.idle.connect(self._start_next_export)
+            dialog.destroyed.connect(lambda _obj=None, d=dialog: self._forget_export(d))
+            self._export_dialogs.append(dialog)
+            dialog.show()
+            if opened:  # offset each new window so they don't cover each other
+                dialog.move(dialog.pos() + QPoint(40 * opened, 40 * opened))
+            opened += 1
+        self._update_export_hints()
+        if len(sources) > 1:
+            self.statusBar().showMessage(f"Opened {opened} Export window(s). Tip: copy one folder at a time; "
+                                         "the others can wait in line.", 10000)
+
+    def _forget_export(self, dialog: ExportDialog) -> None:
+        if dialog in self._export_dialogs:
+            self._export_dialogs.remove(dialog)
+        self._update_export_hints()
+
+    def _update_export_hints(self) -> None:
+        for dialog in self._export_dialogs:
+            dialog.set_group_hint(len(self._export_dialogs))
+
+    def _start_next_export(self) -> None:
+        """When a copy ends, start the export that has waited longest (if nothing else copies)."""
+        if any(d.is_running() for d in self._export_dialogs):
+            return
+        queued = sorted((d for d in self._export_dialogs if d.queued_at is not None), key=lambda d: d.queued_at)
+        if queued:
+            queued[0].start(from_queue=True)
 
     def _release_folder(self, folder: Path) -> None:
         """Stop using files in folder before it is deleted."""
