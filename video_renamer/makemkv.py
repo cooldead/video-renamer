@@ -252,6 +252,26 @@ def parse_progress(line: str) -> Progress | None:
     return None
 
 
+# MakeMKV log messages (from libmakemkv) meaning its key or evaluation period
+# is the problem, e.g. "Evaluation period has expired, shareware functionality
+# unavailable." or "This application version is too old. ... or enter a
+# registration key". Blu-ray needs a key (or the beta key); DVD doesn't.
+KEY_PROBLEMS = (
+    "evaluation period has expired",
+    "evaluation period not started",
+    "evaluation period expired",
+    "temporary key has expired",
+    "enter a registration key",
+)
+
+BETA_KEY_URL = "https://forum.makemkv.com/forum/viewtopic.php?t=1053"
+
+
+def is_key_problem(message: str) -> bool:
+    text = message.lower()
+    return any(problem in text for problem in KEY_PROBLEMS)
+
+
 def preferred_language(settings_file: Path = Path.home() / ".MakeMKV" / "settings.conf") -> str:
     """MakeMKV's preferred language (app_PreferredLanguage), "eng" if unset."""
     try:
@@ -301,6 +321,11 @@ def safe_folder_name(name: str) -> str:
 
 
 # --- commands ---------------------------------------------------------
+
+def reg_args(key: str) -> list[str]:
+    """makemkvcon stores the key in its own settings (the ones the GUI uses)."""
+    return ["reg", key.strip()]
+
 
 def drives_args() -> list[str]:
     return ["-r", "--cache=1", "info", "disc:9999"]

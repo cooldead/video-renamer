@@ -3,6 +3,7 @@ makemkvcon, then drop the unticked tracks with mkvmerge."""
 
 from __future__ import annotations
 
+import html
 import json
 import os
 import shutil
@@ -62,6 +63,7 @@ class RipDialog(QDialog):
         self._done_titles = 0
         self._total_titles = 0
         self._failures: list[str] = []
+        self._key_problem: str | None = None  # MakeMKV's message if its key/evaluation is the problem
         self._scanned_min_length = 120
         self._total_bytes = 0
         self._done_bytes = 0
@@ -161,6 +163,8 @@ class RipDialog(QDialog):
         self._phase = phase
         self._buffer = ""
         self._lines = []
+        if phase in ("drives", "scan"):
+            self._key_problem = None
         process = QProcess(self)
         process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         process.readyReadStandardOutput.connect(self._read_output)
@@ -208,6 +212,8 @@ class RipDialog(QDialog):
             self.status.setText(f"{self._title_text()}: {progress.step}")
         if progress.message:
             self.log.appendPlainText(progress.message)
+            if makemkv.is_key_problem(progress.message):
+                self._key_problem = progress.message
             if self._phase == "rip" and "turned out to be empty" in progress.message:
                 self._report["empty_forced"] = self._report.get("empty_forced", 0) + 1
 
@@ -328,6 +334,7 @@ class RipDialog(QDialog):
         if crashed or not disc.titles:
             self.disc_label.setText("Could not read the disc (see the log below).")
             self.status.setText("")
+            self._explain_key_problem()
             return
         self.disc = disc
         self._scanned_min_length = self.min_length.value()
@@ -542,6 +549,7 @@ class RipDialog(QDialog):
         self._total_titles = len(chosen)
         self._done_titles = 0
         self._failures = []
+        self._key_problem = None
         self._reports = []
         self._total_bytes = sum(max(title.size_bytes, 1) for title, _ in chosen)
         self._done_bytes = 0
@@ -682,8 +690,24 @@ class RipDialog(QDialog):
         box.setDetailedText(report)
         box.setModal(False)
         box.show()
+        if self._failures:
+            self._explain_key_problem()
         if ok:
             self.ripFinished.emit(self._output)
+
+    def _explain_key_problem(self) -> None:
+        if not self._key_problem:
+            return
+        box = QMessageBox(QMessageBox.Icon.Warning, "Rip Disc", "MakeMKV's registration key is missing or has expired.",
+                          QMessageBox.StandardButton.Ok, self)
+        box.setInformativeText(
+            f"MakeMKV said: “{html.escape(self._key_problem)}”<br><br>"
+            "Enter a key in Settings → MakeMKV → Registration key, or in MakeMKV itself (Help → Register). "
+            f"While MakeMKV is in beta, a free key is posted <a href='{makemkv.BETA_KEY_URL}'>on its forum</a>. "
+            "DVDs still work without a key; Blu-rays need one.")
+        box.setTextFormat(Qt.TextFormat.RichText)
+        box.setModal(False)
+        box.show()
 
     def stop(self) -> None:
         if self._process is None:

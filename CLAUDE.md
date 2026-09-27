@@ -8,7 +8,7 @@ For the history of how and why things were built, see `docs/DEVELOPMENT_LOG.md`.
 
 ```sh
 ./run.sh [folder]          # the app
-python3 -m unittest        # unit tests (tests/, ~54), no GUI or network needed
+python3 -m unittest        # unit tests (tests/, ~56), no GUI or network needed
 ```
 - **System packages:** `pyside6 mpv python-mpv mkvtoolnix-cli rsync`, plus `makemkv` for ripping. No pip or virtualenv.
 - **Scope of the unit tests:** they cover the pure modules. The GUI was checked with throwaway scripts (not in the repo) that drive `MainWindow` directly. For those, set `XDG_CONFIG_HOME=<scratch>` so the user's real settings stay untouched.
@@ -51,6 +51,7 @@ python3 -m unittest        # unit tests (tests/, ~54), no GUI or network needed
   - "Forced only" subtitle tracks are dropped by MakeMKV when the disc has no forced subtitles. That's not an error.
   - If a normal ticked track is missing from the file, all tracks are kept and the report warns about it.
   - Title ids depend on `--minlength`, so scan and rip must use the same value.
+  - The registration key is never stored by the app. Settings runs `makemkvcon reg`, and MakeMKV saves the key with its own settings, which the GUI shares. Key and evaluation problems are spotted by message text (`makemkv.KEY_PROBLEMS`) and explained after a failed scan or rip.
 - **Rip progress:** the top bar is the overall progress over all titles, weighted by size; the second bar is the current title, driven by bytes written once copying starts. MakeMKV's "preparing" phase (0 bytes written) is shown separately in the stats.
 - **Settings:** the Rip window must not silently change the default rip folder or minimum length; only Settings does. The export destination used moves to the top of the list.
 - **`makemkvcon` version check:** uses `--noscan` (0.5 s instead of ~12 s) and runs off the GUI thread.

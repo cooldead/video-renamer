@@ -10,7 +10,7 @@ Playback uses libmpv, the engine behind mpv, drawn into the window with OpenGL. 
 sudo pacman -S pyside6 mpv python-mpv
 ```
 
-Ripping discs needs MakeMKV (`makemkv`, which provides `makemkvcon`). Removing unticked tracks after a rip needs `mkvtoolnix-cli`. Exporting uses `rsync`.
+Ripping discs needs MakeMKV (`makemkv`, which provides `makemkvcon`). Blu-rays also need a MakeMKV key, or MakeMKV's trial period. While MakeMKV is in beta, a free key is posted [on its forum](https://forum.makemkv.com/forum/viewtopic.php?t=1053). Enter it in **Settings → MakeMKV → Registration key**, or in MakeMKV itself (Help → Register). Either way, MakeMKV stores the key, so you only enter it once, not every session, and MakeMKV doesn't need to be open. DVDs work without a key. Removing unticked tracks after a rip needs `mkvtoolnix-cli`. Exporting uses `rsync`.
 
 ```sh
 sudo pacman -S mkvtoolnix-cli rsync
@@ -130,6 +130,7 @@ Press **Delete**, use **Edit → Delete…**, or right-click → **Delete…** t
   - Minimum title length and read cache size.
   - Preferred languages: 3-letter codes, e.g. `eng, jpn`. Audio and subtitle tracks in any of them start ticked. Leave it empty to use MakeMKV's own setting.
   - Which tracks start ticked: like MakeMKV, all tracks, or video only.
+  - Registration key: paste a new or renewed key and press Register. MakeMKV checks it and stores it; this app doesn't keep a copy.
 - **Export:**
   - NAS destinations (output). The first one is the default, and the one you export to moves to the top.
   - Whether to delete the local folder after a checked copy.

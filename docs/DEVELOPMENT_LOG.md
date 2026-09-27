@@ -105,6 +105,15 @@ How Video Renamer was built. It was developed with Claude Code in one long sessi
 ## 17. Release v1.1.0 (2026-09-26)
 - Released as v1.1.0: the multi-folder export queue, plus `CLAUDE.md` and this log. v1.0.0 was the first release (2026-09-25).
 
+## 18. MakeMKV registration key (2026-09-27)
+- **Question:** how does a new user's copy reach MakeMKV, and should the app take their key or tell them to open MakeMKV first?
+- **Answer:** the app only runs `makemkvcon`, which reads the key from MakeMKV's own settings (the same ones the GUI writes). So the key is set up once, and the GUI never has to be running.
+- **Built:**
+  - The Rip window spots MakeMKV's key and evaluation messages (the text was taken from `libmakemkv`). When a scan or rip fails after one, it explains the problem, says where to enter a key and links the free beta key.
+  - **Settings → MakeMKV → Registration key** runs `makemkvcon reg <key>`, so MakeMKV checks the key and stores it itself. The app never keeps a copy.
+  - The README says a key (or the trial) is needed for Blu-rays.
+- **Tested** offscreen with a throwaway `HOME`: an invalid key shows "Key not found or invalid", and the expiry message brings up the explanation. A valid key was not tried.
+
 ## Open items / ideas not done
 - **Whether the all-tracks profile rips every language** was confirmed on real rips (29/27 tracks). Removing tracks after a real multi-language rip has only been tested on short titles.
 - **The first two real rips (Indiana Jones, One Battle After Another)** still contain all their tracks; they were made before the matching fix.

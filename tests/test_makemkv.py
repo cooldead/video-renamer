@@ -84,6 +84,21 @@ class ProgressTest(unittest.TestCase):
         self.assertIsNone(makemkv.parse_progress("PRGV:1,1,0"))
 
 
+class KeyProblemTest(unittest.TestCase):
+    def test_key_messages(self):
+        for message in ("Evaluation period has expired, shareware functionality unavailable.",
+                        "Evaluation version, evaluation period expired 3 day(s) ago",
+                        "Your temporary key has expired and was removed. Please restart the application.",
+                        "This application version is too old.  Please download the latest version at "
+                        "https://www.makemkv.com/ or enter a registration key to continue using the current version."):
+            self.assertTrue(makemkv.is_key_problem(message), message)
+        for message in ("Failed to open disc", "Evaluation version, 25 day(s) out of 30 remaining"):
+            self.assertFalse(makemkv.is_key_problem(message), message)
+
+    def test_reg_args(self):
+        self.assertEqual(makemkv.reg_args("  T-abc123\n"), ["reg", "T-abc123"])
+
+
 class TrackMatchingTest(unittest.TestCase):
     @staticmethod
     def disc_track(i, kind, codec, lang):

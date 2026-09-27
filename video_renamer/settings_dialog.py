@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import html
 import shutil
 import subprocess
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QSettings, Qt, QThread, Signal
+from PySide6.QtCore import QObject, QProcess, QSettings, Qt, QThread, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout,
@@ -155,6 +156,20 @@ class SettingsDialog(QDialog):
         for value, text in PRETICK_CHOICES:
             self.pretick.addItem(text, value)
         self.pretick.setCurrentIndex(max(0, self.pretick.findData(get("pretick"))))
+        # The key is never stored here: makemkvcon checks it and saves it with
+        # MakeMKV's own settings, so the GUI and this app always share one key.
+        self.key = QLineEdit()
+        self.key.setPlaceholderText("Only needed for a new or renewed key")
+        self.register_button = QPushButton(QIcon.fromTheme("dialog-password"), "Register")
+        self.register_button.clicked.connect(self._register_key)
+        self.key.returnPressed.connect(self._register_key)
+        key_row = QHBoxLayout()
+        key_row.addWidget(self.key, 1)
+        key_row.addWidget(self.register_button)
+        self.key_status = QLabel(f"Blu-rays need a MakeMKV key. While MakeMKV is in beta, a free key is posted "
+                                 f"<a href='{makemkv.BETA_KEY_URL}'>on its forum</a>.")
+        self.key_status.setOpenExternalLinks(True)
+        self.key_status.setWordWrap(True)
         form = QFormLayout(makemkv_tab)
         form.addRow("makemkvcon", self.makemkvcon)
         form.addRow("mkvmerge", self.mkvmerge)
@@ -165,6 +180,8 @@ class SettingsDialog(QDialog):
         form.addRow("Preferred languages", self.language)
         form.addRow("", self.language_problem)
         form.addRow("Tracks ticked at first", self.pretick)
+        form.addRow("Registration key", key_row)
+        form.addRow("", self.key_status)
         form.addRow("", QLabel("mkvmerge (package mkvtoolnix-cli) removes the tracks you untick after ripping."))
         tabs.addTab(makemkv_tab, QIcon.fromTheme("media-optical"), "MakeMKV")
 
@@ -258,6 +275,32 @@ class SettingsDialog(QDialog):
             f"{name}: " + (f"<span style='color:#3a3'>{version}</span>" if version
                            else "<span style='color:#d33'>not found</span>")
             for name, version in versions.items()))
+
+    def _register_key(self) -> None:
+        key = self.key.text().strip()
+        if not key:
+            return
+        self.register_button.setEnabled(False)
+        self.key_status.setText("Registering…")
+        process = QProcess(self)
+        process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+        process.finished.connect(lambda code, _status: self._registered(process, code))
+        process.errorOccurred.connect(lambda error: error == QProcess.ProcessError.FailedToStart
+                                      and self._registered(process, -1))
+        process.start(self.makemkvcon.text() or "makemkvcon", makemkv.reg_args(key))
+
+    def _registered(self, process: QProcess, exit_code: int) -> None:
+        self.register_button.setEnabled(True)
+        output = bytes(process.readAll()).decode("utf-8", "replace").strip()
+        process.deleteLater()
+        if exit_code == 0:
+            self.key.clear()
+            self.key_status.setText("<span style='color:#3a3'>Key registered with MakeMKV.</span>")
+        elif exit_code == -1:
+            self.key_status.setText("<span style='color:#d33'>Could not start makemkvcon. Is it installed?</span>")
+        else:
+            self.key_status.setText(f"<span style='color:#d33'>MakeMKV did not accept the key: "
+                                    f"{html.escape(output) or f'exit code {exit_code}'}</span>")
 
     def done(self, result: int) -> None:
         # Don't close while the check thread still runs (it takes well under a second).
