@@ -133,6 +133,9 @@ How Video Renamer was built. It was developed with Claude Code in one long sessi
   - pacman: `makepkg` builds, the tests pass in `check()`, the desktop file and metainfo validate, and the packaged copy starts. It was not installed with pacman.
   - Flatpak: built and installed per-user. The wrappers reach the host tools and the Settings check finds them; Stop ended a host rsync; the Trash worked; the window showed a test video decoded on the GPU. A real disc rip in the Flatpak was not tried.
 
+## 21. Release v1.3.0 (2026-09-27)
+- Released as v1.3.0: pacman and Flatpak packages, and the app icon.
+
 ## Open items / ideas not done
 - **Whether the all-tracks profile rips every language** was confirmed on real rips (29/27 tracks). Removing tracks after a real multi-language rip has only been tested on short titles.
 - **The first two real rips (Indiana Jones, One Battle After Another)** still contain all their tracks; they were made before the matching fix.
