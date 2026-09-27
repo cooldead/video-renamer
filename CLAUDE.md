@@ -59,6 +59,17 @@ python3 -m unittest        # unit tests (tests/, ~56), no GUI or network needed
 - **Several exports:** one `ExportDialog` per selected folder, tracked in `MainWindow._export_dialogs`. They copy one at a time by default. Starting while another copies offers "wait", which puts it in a queue (`queued_at`). Each dialog emits `idle` when a copy ends or stops, and `MainWindow._start_next_export` then starts the one that has waited longest.
 - **Deleting:** goes to the Trash by default via `QFile.moveToTrash`; the confirmation can be turned off with "Don't ask again". The player is released first.
 
+## Packaging
+
+- **App id** `io.github.cooldead.VideoRenamer` (`main_window.APP_ID`): desktop file, icon and metainfo in `data/`, and the Flatpak id. `setDesktopFileName` uses it, so Wayland matches the window to the installed desktop file.
+- `packaging/install.sh <destdir> <prefix>` is the one install step for both packages. The code goes into `<prefix>/lib/video-renamer`, not site-packages, so a Python upgrade doesn't break the pacman package. The launcher is `<prefix>/bin/video-renamer`.
+- **pacman:** `packaging/arch/PKGBUILD` builds from the `v$pkgver` git tag and runs the unit tests. To test before tagging, use a copy whose `prepare()` rsyncs the working tree.
+- **Flatpak:** `packaging/flatpak/`, on io.qt.PySide.BaseApp and KDE 6.11. libmpv is built with LuaJIT, because `osc=no` fails without Lua. `host-tool.sh` is installed as makemkvcon, mkvmerge, rsync, ffprobe and gio, and runs them on the host with `flatpak-spawn --host`. Exit 127 = not on the host, which `tool_version` reports as not found.
+  - **Stopping:** use `rip_dialog.stop_process` (SIGTERM, then SIGKILL). flatpak-spawn passes SIGTERM on to the host program but can't pass SIGKILL, so a bare `kill()` would leave the rip or copy running. Tested.
+  - **Trash:** `QFile.moveToTrash` fails in the sandbox; `main_window.move_to_trash` then uses `gio trash` (on the host).
+  - Host programs start in the app's working folder; the wrapper switches to `$HOME` when that folder is `/app` or `/usr`, which don't exist on the host.
+- **Version numbers** are in `packaging/arch/PKGBUILD` (`pkgver`) and in the metainfo `<releases>`. Bump both before tagging a release.
+
 ## Conventions
 
 - Match the existing style: pure logic in modules without Qt, with unit tests. Dialogs are thin. Comments explain *why*.

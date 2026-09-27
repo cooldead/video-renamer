@@ -25,6 +25,10 @@ PRETICK_CHOICES = [
 ]
 
 
+# Exit code of the Flatpak's host-tool wrapper when the host lacks the program.
+NOT_INSTALLED = 127
+
+
 def tool_version(program: str) -> str | None:
     """First line of a tool's version output, or None if it can't be run."""
     path = shutil.which(program)
@@ -33,13 +37,16 @@ def tool_version(program: str) -> str | None:
     try:
         if Path(path).name.startswith("makemkvcon"):
             # --noscan: report the version without scanning the drives (~0.5 s instead of ~12 s)
-            out = subprocess.run([path, "-r", "--noscan", "--cache=1", "info", "disc:9999"], capture_output=True,
-                                 text=True, timeout=30).stdout
-            for line in out.splitlines():
+            result = subprocess.run([path, "-r", "--noscan", "--cache=1", "info", "disc:9999"], capture_output=True,
+                                    text=True, timeout=30)
+            if result.returncode == NOT_INSTALLED:
+                return None
+            for line in result.stdout.splitlines():
                 if line.startswith("MSG:1005,"):
                     return line.split('"')[1].replace(" started", "")
             return "found"
-        return subprocess.run([path, "--version"], capture_output=True, text=True, timeout=15).stdout.splitlines()[0]
+        result = subprocess.run([path, "--version"], capture_output=True, text=True, timeout=15)
+        return None if result.returncode == NOT_INSTALLED else result.stdout.splitlines()[0]
     except (OSError, IndexError, subprocess.SubprocessError):
         return "found"
 

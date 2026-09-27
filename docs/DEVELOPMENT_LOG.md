@@ -117,10 +117,25 @@ How Video Renamer was built. It was developed with Claude Code in one long sessi
 ## 19. Release v1.2.0 (2026-09-27)
 - Released as v1.2.0: MakeMKV key errors explained, and a key can be registered from Settings.
 
+## 20. pacman and Flatpak packages (2026-09-27)
+- **Request:** include packages for pacman and Flatpak. The user chose to have the Flatpak use the host's MakeMKV, mkvmerge and rsync, and to install the build tools so both packages could be tested for real.
+- **Built:**
+  - An app id and icon; a desktop file and metainfo in `data/`.
+  - `packaging/install.sh`, used by both packages.
+  - A PKGBUILD that builds from the git tag.
+  - A Flatpak manifest (PySide BaseApp 6.11, libmpv built as in Haruna's Flathub package) with a host-tool wrapper.
+- **Found while testing the Flatpak:**
+  - `flatpak-spawn` passes SIGTERM on but not SIGKILL, so both Stop buttons now terminate first.
+  - `QFile.moveToTrash` fails in the sandbox; the app now falls back to `gio trash`.
+  - mpv built without Lua has no `osc` option, and the player crashed. mpv is now built with LuaJIT.
+  - The host program runs in the app's working folder, which may not exist on the host.
+- **Tested:**
+  - pacman: `makepkg` builds, the tests pass in `check()`, the desktop file and metainfo validate, and the packaged copy starts. It was not installed with pacman.
+  - Flatpak: built and installed per-user. The wrappers reach the host tools and the Settings check finds them; Stop ended a host rsync; the Trash worked; the window showed a test video decoded on the GPU. A real disc rip in the Flatpak was not tried.
+
 ## Open items / ideas not done
 - **Whether the all-tracks profile rips every language** was confirmed on real rips (29/27 tracks). Removing tracks after a real multi-language rip has only been tested on short titles.
 - **The first two real rips (Indiana Jones, One Battle After Another)** still contain all their tracks; they were made before the matching fix.
 - **Possible future work:**
   - Store disc info (playlists) next to rips, for exact TheDiscDB matching by playlist instead of length.
-  - A package or installer instead of `run.sh`.
   - Keep the GUI smoke tests in the repo.

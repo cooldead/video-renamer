@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QFile, QFileSystemWatcher, QModelIndex, QObject, QPoint, QSettings, Qt, QTimer, Signal
@@ -25,6 +26,21 @@ from .settings_dialog import SettingsDialog
 from .export import folder_size
 
 APP_NAME = "Video Renamer"
+APP_ID = "io.github.cooldead.VideoRenamer"  # desktop file, icon and Flatpak id
+
+
+def move_to_trash(path: Path) -> None:
+    """Qt's Trash, or else `gio trash`: inside the Flatpak Qt can't reach the
+    user's Trash, and gio runs on the host there (see host-tool.sh)."""
+    if QFile.moveToTrash(str(path)):
+        return
+    try:
+        if shutil.which("gio") and subprocess.run(["gio", "trash", "--", str(path)], capture_output=True,
+                                                  timeout=60).returncode == 0:
+            return
+    except (OSError, subprocess.SubprocessError):
+        pass
+    raise OSError("could not move it to the Trash")
 
 
 class _NameEditKeys(QObject):
@@ -856,8 +872,7 @@ class MainWindow(QMainWindow):
         for path in paths:
             try:
                 if to_trash:
-                    if not QFile.moveToTrash(str(path)):
-                        raise OSError("could not move it to the Trash")
+                    move_to_trash(path)
                 elif path.is_dir() and not path.is_symlink():
                     shutil.rmtree(path)
                 else:

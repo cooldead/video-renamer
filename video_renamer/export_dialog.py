@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 
 from . import export
 from . import settings as app_settings
-from .rip_dialog import human_bytes
+from .rip_dialog import human_bytes, stop_process
 
 MAX_RECENT = 8
 _queue_order = itertools.count()  # order in which exports joined the queue
@@ -279,8 +279,7 @@ class ExportDialog(QDialog):
             return
         if self._process is not None:
             self._process.finished.disconnect()
-            self._process.kill()
-            self._process.waitForFinished(5000)
+            stop_process(self._process)
             self._process = None
             self._set_busy(False)
             self.status.setText("Stopped. Starting the export again continues where it left off.")

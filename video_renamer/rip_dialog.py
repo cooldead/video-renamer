@@ -36,6 +36,16 @@ def human_bytes(size: int) -> str:
     return f"{value:.1f} TB"
 
 
+def stop_process(process: QProcess) -> None:
+    """Ask the program to stop, and kill it only if it doesn't. In the Flatpak
+    the program runs on the host through flatpak-spawn, which passes SIGTERM
+    on, but can't pass on SIGKILL: that would leave the host program running."""
+    process.terminate()
+    if not process.waitForFinished(5000):
+        process.kill()
+        process.waitForFinished(2000)
+
+
 class RipDialog(QDialog):
     """Non-modal: a rip takes a long time and the renamer stays usable.
     One window per drive; several can rip at the same time."""
@@ -725,8 +735,7 @@ class RipDialog(QDialog):
         self._phase = "idle"
         if process is not None:
             process.finished.disconnect()
-            process.kill()
-            process.waitForFinished(5000)
+            stop_process(process)
         if phase == "rip" and self._current is not None:
             partial = self._output / self._current[0].output_file
             if partial.exists():

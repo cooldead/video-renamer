@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Video Renamer
+GenericName=Video File Renamer
+Comment=Preview, rename and organise videos; rip discs with MakeMKV; export to the NAS
+Exec=video-renamer %f
+Icon=io.github.cooldead.VideoRenamer
+Terminal=false
+Categories=AudioVideo;Video;
+Keywords=rename;video;mkv;makemkv;rip;blu-ray;dvd;nas;

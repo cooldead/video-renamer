@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Video Renamer: a film frame with a play mark and a pencil. -->
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3d5a80"/>
+      <stop offset="1" stop-color="#293d5c"/>
+    </linearGradient>
+  </defs>
+  <rect x="10" y="18" width="108" height="92" rx="12" fill="url(#body)"/>
+  <g fill="#e0e6ef">
+    <rect x="18" y="24" width="10" height="8" rx="2"/>
+    <rect x="36" y="24" width="10" height="8" rx="2"/>
+    <rect x="54" y="24" width="10" height="8" rx="2"/>
+    <rect x="72" y="24" width="10" height="8" rx="2"/>
+    <rect x="90" y="24" width="10" height="8" rx="2"/>
+    <rect x="18" y="96" width="10" height="8" rx="2"/>
+    <rect x="36" y="96" width="10" height="8" rx="2"/>
+    <rect x="54" y="96" width="10" height="8" rx="2"/>
+    <rect x="72" y="96" width="10" height="8" rx="2"/>
+    <rect x="90" y="96" width="10" height="8" rx="2"/>
+  </g>
+  <rect x="18" y="40" width="92" height="48" rx="4" fill="#98c1d9"/>
+  <path d="M50 50 L74 64 L50 78 Z" fill="#293d5c"/>
+  <!-- pencil -->
+  <g transform="translate(96 60) rotate(45)">
+    <rect x="-7" y="-2" width="14" height="46" rx="2" fill="#f2b134"/>
+    <rect x="-7" y="-10" width="14" height="10" rx="3" fill="#ee6c4d"/>
+    <rect x="-7" y="-1" width="14" height="4" fill="#c9ced6"/>
+    <path d="M-7 44 L7 44 L0 58 Z" fill="#f6d8a8"/>
+    <path d="M-2.5 53 L2.5 53 L0 58 Z" fill="#293d5c"/>
+  </g>
+</svg>

@@ -16,6 +16,32 @@ Ripping discs needs MakeMKV (`makemkv`, which provides `makemkvcon`). Blu-rays a
 sudo pacman -S mkvtoolnix-cli rsync
 ```
 
+## Install
+
+Choose one. Both add **Video Renamer** to the application menu. For ripping and exporting, install MakeMKV, `mkvtoolnix-cli` and `rsync` on the computer as described above, whichever way you install the app.
+
+**pacman package (Arch, CachyOS):**
+
+```sh
+git clone https://github.com/cooldead/video-renamer.git
+cd video-renamer/packaging/arch
+makepkg -si
+```
+
+**Flatpak:**
+
+```sh
+flatpak install --user flathub org.flatpak.Builder
+git clone https://github.com/cooldead/video-renamer.git
+cd video-renamer
+flatpak run org.flatpak.Builder --user --install --install-deps-from=flathub --force-clean \
+    ~/.cache/video-renamer-flatpak packaging/flatpak/io.github.cooldead.VideoRenamer.yml
+```
+
+The first Flatpak build downloads the KDE runtime and compiles mpv, so it takes a while. The Flatpak runs MakeMKV, mkvmerge, rsync and ffprobe **from the computer**, not from inside the sandbox. It uses MakeMKV's own Flatpak (`com.makemkv.MakeMKV`) if `makemkvcon` isn't installed, and MKVToolNix's Flatpak likewise. Your MakeMKV key and settings are shared with MakeMKV itself. For this, the Flatpak has permission to start programs outside its sandbox, and to read and write all your files (video folders, NAS mounts).
+
+**From the source folder, without installing:** `./run.sh [folder]`.
+
 ## Disc → rename → NAS workflow
 
 1. **Rip Disc… (Ctrl+D).**

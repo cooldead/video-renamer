@@ -1,2 +1,5 @@
 __pycache__/
 *.pyc
+
+# Flatpak builds made inside the repo
+.flatpak-builder/

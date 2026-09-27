@@ -1,0 +1,122 @@
+app-id: io.github.cooldead.VideoRenamer
+runtime: org.kde.Platform
+runtime-version: '6.11'
+sdk: org.kde.Sdk
+base: io.qt.PySide.BaseApp
+base-version: '6.11'
+command: video-renamer
+finish-args:
+  - --share=ipc
+  - --share=network               # TheDiscDB
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --socket=pulseaudio
+  - --device=dri                  # GPU video decoding and drawing
+  - --filesystem=host             # video folders, NAS mounts
+  # makemkvcon, mkvmerge, rsync, ffprobe and gio (Trash) run on the host (see host-tool.sh)
+  - --talk-name=org.freedesktop.Flatpak
+cleanup:
+  - '*.a'
+  - '*.la'
+  - /include
+  - /lib/cmake
+  - /lib/pkgconfig
+  - /share/man
+  - /share/doc
+
+modules:
+  # libmpv, built like Haruna's Flathub package does; ffmpeg comes from the runtime.
+  - name: libmpv
+    buildsystem: meson
+    config-opts:
+      - -Dlibmpv=true
+      - -Dcplayer=false
+      - -Dlua=enabled                 # options such as osc exist only with Lua
+      - -Ddebug=false
+      - -Dbuild-date=false
+      - -Dalsa=disabled
+      - -Dmanpage-build=disabled
+    sources:
+      - type: archive
+        url: https://github.com/mpv-player/mpv/archive/refs/tags/v0.41.0.tar.gz
+        sha256: ee21092a5ee427353392360929dc64645c54479aefdb5babc5cfbb5fad626209
+    modules:
+      - name: luajit
+        no-autogen: true
+        make-args:
+          - BUILDMODE=dynamic
+          - PREFIX=${FLATPAK_DEST}
+        make-install-args:
+          - PREFIX=${FLATPAK_DEST}
+        cleanup:
+          - /bin
+        sources:
+          - type: git
+            url: https://github.com/openresty/luajit2.git
+            tag: v2.1-20260914
+            commit: ae3d1eecfdbe70b54040779f7b4655e132b9d875
+      - name: libplacebo
+        buildsystem: meson
+        config-opts:
+          - -Ddemos=false
+        sources:
+          - type: git
+            url: https://github.com/haasn/libplacebo.git
+            tag: v7.360.1
+            commit: cee9b076f2c63104ccfd497fa79c39a867293ec4
+      - name: libXpresent
+        buildsystem: autotools
+        sources:
+          - type: archive
+            url: https://xorg.freedesktop.org/archive/individual/lib/libXpresent-1.0.2.tar.xz
+            sha256: 4e5b21b4812206a4b223013606ae31170502c1043038777a1ef8f70c09d37602
+      - name: libass
+        config-opts:
+          - --disable-static
+        sources:
+          - type: archive
+            url: https://github.com/libass/libass/releases/download/0.17.5/libass-0.17.5.tar.gz
+            sha256: caab4b993dd7be6187c55623b789ed75dddefea6e65938af134637c732fe094a
+      - name: uchardet
+        buildsystem: cmake-ninja
+        config-opts:
+          - -DCMAKE_BUILD_TYPE=Release
+          - -DBUILD_STATIC=0
+          - -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+        cleanup:
+          - /bin
+        sources:
+          - type: archive
+            url: https://www.freedesktop.org/software/uchardet/releases/uchardet-0.0.8.tar.xz
+            sha256: e97a60cfc00a1c147a674b097bb1422abd9fa78a2d9ce3f3fdcc2e78a34ac5f0
+
+  - name: python-mpv
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-deps --no-build-isolation --no-index --prefix=${FLATPAK_DEST} python_mpv-1.0.8-py3-none-any.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/22/f3/4c632eaacebfc62ab9414586137aecf6c0ea2a1e99708cf5a4c0dec13ae0/python_mpv-1.0.8-py3-none-any.whl
+        sha256: b5296403e990fb7348df4ca2211937a030f524bf638657bda7e45a00bc2df0cd
+
+  - name: host-tools
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 host-tool.sh ${FLATPAK_DEST}/libexec/host-tool
+      - mkdir -p ${FLATPAK_DEST}/bin
+      - for tool in makemkvcon mkvmerge rsync ffprobe gio; do ln -s ../libexec/host-tool ${FLATPAK_DEST}/bin/$tool; done
+    sources:
+      - type: file
+        path: host-tool.sh
+
+  - name: video-renamer
+    buildsystem: simple
+    build-commands:
+      - sh packaging/install.sh "" ${FLATPAK_DEST}
+    sources:
+      - type: dir
+        path: ../..
+        skip:
+          - .git
+          - packaging/flatpak/.flatpak-builder
+          - packaging/flatpak/build
