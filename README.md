@@ -62,6 +62,7 @@ The first Flatpak build downloads the KDE runtime and compiles mpv, so it takes 
    - **Several drives:** press Rip Disc… again to open another window. Each window uses its own drive, so discs in different drives rip at the same time. A window never takes a drive another window is using. If two discs have the same name, the second is saved to `Name (2)`. When a rip finishes while you're watching or typing a name, the tree just refreshes and the status bar tells you, so you stay where you are.
 2. **Match with TheDiscDB… (Ctrl+T, or right-click a folder)** is optional and never automatic.
    - **Search:** it reads the length of every video in the folder and searches [TheDiscDB](https://thediscdb.com) using the folder name, which you can edit.
+   - **Link:** if the search doesn't find your disc, find it on thediscdb.com and paste its link into the search box instead, e.g. `https://thediscdb.com/movie/<title>/releases/<release>/discs/<disc>`. A link to a release or a title shows all of its discs.
    - **Disc choice:** the discs found are ranked by how many of your files match a named title by length (±2 s). You can pick another disc.
    - **Suggestions:** the table shows each file, its length, its match, and a suggested name in the library's layout:
      - main movie → `Title (Year)`

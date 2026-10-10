@@ -56,6 +56,7 @@ python3 -m unittest        # unit tests (tests/, ~56), no GUI or network needed
 - **Settings:** the Rip window must not silently change the default rip folder or minimum length; only Settings does. The export destination used moves to the top of the list.
 - **`makemkvcon` version check:** uses `--noscan` (0.5 s instead of ~12 s) and runs off the GUI thread.
 - **TheDiscDB:** never automatic. Match by length (±2 s) on named titles only; the user approves and can edit every rename. The folder and file renames are recorded as one multi-step undo entry.
+  - A thediscdb.com link in the search box is looked up by media slug (`SLUG_QUERY`), then narrowed to the link's release and disc slugs, which match the URL parts. Disc fields are read directly from `releases.discs`: the nested `discs { disc { … } }` form has the titles but empty index, name and slug.
 - **Several exports:** one `ExportDialog` per selected folder, tracked in `MainWindow._export_dialogs`. They copy one at a time by default. Starting while another copies offers "wait", which puts it in a queue (`queued_at`). Each dialog emits `idle` when a copy ends or stops, and `MainWindow._start_next_export` then starts the one that has waited longest.
 - **Deleting:** goes to the Trash by default via `QFile.moveToTrash`; the confirmation can be turned off with "Don't ask again". The player is released first.
 

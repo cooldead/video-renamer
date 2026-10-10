@@ -136,6 +136,14 @@ How Video Renamer was built. It was developed with Claude Code in one long sessi
 ## 21. Release v1.3.0 (2026-09-27)
 - Released as v1.3.0: pacman and Flatpak packages, and the app icon.
 
+## 22. TheDiscDB link when the search misses (2026-10-10)
+- **Request:** let the user paste a TheDiscDB link when the search doesn't find the disc.
+- **Built:**
+  - The Match window's search box also takes a thediscdb.com link (movie or series; title, release or disc page). The app looks the title up by its slug and keeps only the release and disc the link points to. When a search finds nothing, the message suggests pasting a link.
+  - **Fixed along the way:** the query read each disc's number, name and slug from a nested object that leaves them empty, so every disc was labelled "disc 1". Box sets with many discs (e.g. Friends) were impossible to tell apart. The disc fields now come straight from the release's discs.
+- **Tested:** unit tests for link parsing and filtering. Live: the 4K UHD link for the real Dr. Strangelove rips matched 12 of 14 files; Friends discs show as "Season 1, Disc 1" etc. The window was checked offscreen. A link was not tried by hand in the real window.
+- **Also found:** Escape From Alcatraz isn't in TheDiscDB at all, so a link can't help there.
+
 ## Open items / ideas not done
 - **Whether the all-tracks profile rips every language** was confirmed on real rips (29/27 tracks). Removing tracks after a real multi-language rip has only been tested on short titles.
 - **The first two real rips (Indiana Jones, One Battle After Another)** still contain all their tracks; they were made before the matching fix.

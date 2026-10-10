@@ -55,13 +55,15 @@ class DiscDbDialog(QDialog):
         self._network = QNetworkAccessManager(self)
         self._reply: QNetworkReply | None = None
         self._ranked: list[tuple[DbDisc, dict[Path, DbTitle]]] = []
+        self._link: tuple[str, str, str] | None = None  # the pasted link being looked up
 
         self.search_edit = QLineEdit(discdb.search_text(folder.name))
+        self.search_edit.setPlaceholderText("A title, or a disc's link from thediscdb.com")
         self.search_edit.returnPressed.connect(self.search)
         self.search_button = QPushButton(QIcon.fromTheme("edit-find"), "Search TheDiscDB")
         self.search_button.clicked.connect(self.search)
         search_row = QHBoxLayout()
-        search_row.addWidget(QLabel("Search"))
+        search_row.addWidget(QLabel("Search or link"))
         search_row.addWidget(self.search_edit, 1)
         search_row.addWidget(self.search_button)
 
@@ -73,6 +75,7 @@ class DiscDbDialog(QDialog):
 
         self.status = QLabel()
         self.status.setWordWrap(True)
+        self.status.setOpenExternalLinks(True)
 
         self.table = QTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(["", "File", "Length", "TheDiscDB match", "New name (extension is kept)"])
@@ -150,8 +153,13 @@ class DiscDbDialog(QDialog):
         request.setHeader(QNetworkRequest.KnownHeaders.ContentTypeHeader, "application/json")
         request.setRawHeader(b"User-Agent", b"video-renamer")
         request.setTransferTimeout(REQUEST_TIMEOUT_MS)
-        body = json.dumps({"query": discdb.SEARCH_QUERY, "variables": {"text": text}}).encode()
-        self.status.setText(f"Searching TheDiscDB for “{text}”…")
+        self._link = discdb.parse_link(text)
+        if self._link:
+            body = json.dumps({"query": discdb.SLUG_QUERY, "variables": {"slug": self._link[0]}}).encode()
+            self.status.setText("Looking up the link on TheDiscDB…")
+        else:
+            body = json.dumps({"query": discdb.SEARCH_QUERY, "variables": {"text": text}}).encode()
+            self.status.setText(f"Searching TheDiscDB for “{text}”…")
         self.search_button.setEnabled(False)
         self._reply = self._network.post(request, QByteArray(body))
         self._reply.finished.connect(self._search_finished)
@@ -172,6 +180,8 @@ class DiscDbDialog(QDialog):
             self.status.setText(f"<span style='color:#d33'>TheDiscDB error: {response['errors'][0].get('message')}</span>")
             return
         discs = discdb.parse_search(response)
+        if self._link:
+            discs = discdb.discs_for_link(discs, *self._link[1:])
         self._ranked = discdb.rank_discs(self.files, discs)
         self.disc_combo.blockSignals(True)
         self.disc_combo.clear()
@@ -179,7 +189,11 @@ class DiscDbDialog(QDialog):
             self.disc_combo.addItem(f"{len(matches)}/{len(self.files)} files match · {disc.label()}")
         self.disc_combo.blockSignals(False)
         if not self._ranked:
-            self.status.setText("Nothing found. Try a different search (e.g. just the main title).")
+            self.status.setText(
+                "Nothing found for that link. Check that it's a disc page on thediscdb.com and that the disc "
+                "lists named titles." if self._link else
+                "Nothing found. Try a different search (e.g. just the main title), or find the disc on "
+                '<a href="https://thediscdb.com">thediscdb.com</a> and paste its link here.')
             self._fill_table({})
             return
         self.disc_combo.setCurrentIndex(0)

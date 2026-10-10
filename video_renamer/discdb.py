@@ -15,27 +15,36 @@ from .makemkv import duration_seconds
 
 ENDPOINT = "https://thediscdb.com/graphql"
 
-SEARCH_QUERY = """
-query Search($text: String!) {
-  mediaItems(first: 10, where: { title: { contains: $text } }) {
+# Fields come straight from each release disc: the older nested
+# "discs { disc { ... } }" form still has the titles but leaves the disc's
+# index, name and slug empty, so every disc looked like "disc 1".
+_MEDIA_FIELDS = """
     nodes {
       title year type slug
       releases {
         title slug year
         discs {
-          disc {
-            index name format
-            titles {
-              index duration size sourceFile itemType description season episode
-              item { title type season episode }
-            }
+          index name slug format
+          titles {
+            index duration size sourceFile itemType description season episode
+            item { title type season episode }
           }
         }
       }
     }
-  }
-}
 """
+
+SEARCH_QUERY = """
+query Search($text: String!) {
+  mediaItems(first: 10, where: { title: { contains: $text } }) {%s}
+}
+""" % _MEDIA_FIELDS
+
+SLUG_QUERY = """
+query BySlug($slug: String!) {
+  mediaItems(first: 1, where: { slug: { eq: $slug } }) {%s}
+}
+""" % _MEDIA_FIELDS
 
 MATCH_TOLERANCE = 2.0  # seconds; TheDiscDB stores lengths to the second
 
@@ -77,13 +86,15 @@ class DbDisc:
     disc_name: str
     format: str
     titles: list[DbTitle] = field(default_factory=list)
+    release_slug: str = ""
+    disc_slug: str = ""
 
     @property
     def base_name(self) -> str:
         return f"{self.media_title} ({self.year})" if self.year else self.media_title
 
     def label(self) -> str:
-        disc = f"disc {self.disc_index + 1}" + (f" “{self.disc_name}”" if self.disc_name else "")
+        disc = f"“{self.disc_name}”" if self.disc_name else f"disc {self.disc_index}" if self.disc_index else "disc"
         return f"{self.base_name} · {self.release} · {disc} · {self.format}"
 
 
@@ -102,7 +113,7 @@ def parse_search(response: dict) -> list[DbDisc]:
     for media in nodes:
         for release in media.get("releases") or []:
             for release_disc in release.get("discs") or []:
-                disc = release_disc.get("disc") or {}
+                disc = release_disc.get("disc") or release_disc  # see _MEDIA_FIELDS
                 titles = []
                 for title in disc.get("titles") or []:
                     item = title.get("item") or {}
@@ -122,8 +133,27 @@ def parse_search(response: dict) -> list[DbDisc]:
                 if titles:
                     discs.append(DbDisc(media.get("title") or "", media.get("year"), media.get("type") or "",
                                         release.get("title") or "", disc.get("index") or 0,
-                                        disc.get("name") or "", disc.get("format") or "", titles))
+                                        disc.get("name") or "", disc.get("format") or "", titles,
+                                        release.get("slug") or "", disc.get("slug") or ""))
     return discs
+
+
+_LINK = re.compile(r"(?:https?://)?(?:www\.)?thediscdb\.com/(?:movie|series|[a-z]+)/([^/?#\s]+)"
+                   r"(?:/releases/([^/?#\s]+)(?:/discs/([^/?#\s]+))?)?", re.IGNORECASE)
+
+
+def parse_link(text: str) -> tuple[str, str, str] | None:
+    """(media slug, release slug, disc slug) from a thediscdb.com link, e.g.
+    https://thediscdb.com/movie/<media>/releases/<release>/discs/<disc>.
+    The release and disc parts are "" when the link stops before them."""
+    found = _LINK.search(text.strip())
+    return (found.group(1), found.group(2) or "", found.group(3) or "") if found else None
+
+
+def discs_for_link(discs: list[DbDisc], release_slug: str, disc_slug: str) -> list[DbDisc]:
+    """The discs a link points to: one disc, one release, or the whole title."""
+    return [d for d in discs if (not release_slug or d.release_slug == release_slug)
+            and (not disc_slug or d.disc_slug == disc_slug)]
 
 
 @dataclass

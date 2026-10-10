@@ -68,6 +68,38 @@ class MatchTest(unittest.TestCase):
         self.assertEqual(sorted([names[Path("f2")], names[Path("f3")]]), ["extras/Trailer", "extras/Trailer (2)"])
 
 
+class LinkTest(unittest.TestCase):
+    MEDIA = "dr-strangelove-or-how-i-learned-to-stop-worrying-and-love-the-bomb-1964"
+    RELEASE = "2021-dr-strangelove-or-how-i-learned-to-stop-worrying-and-love-the-bomb"
+
+    def test_parse_link(self):
+        base = f"https://thediscdb.com/movie/{self.MEDIA}"
+        self.assertEqual(discdb.parse_link(f"{base}/releases/{self.RELEASE}/discs/4k-uhd"),
+                         (self.MEDIA, self.RELEASE, "4k-uhd"))
+        self.assertEqual(discdb.parse_link(f"  {base}/releases/{self.RELEASE}?x=1 "), (self.MEDIA, self.RELEASE, ""))
+        self.assertEqual(discdb.parse_link(f"thediscdb.com/movie/{self.MEDIA}/"), (self.MEDIA, "", ""))
+        self.assertEqual(discdb.parse_link("https://www.thediscdb.com/series/friends-1994/releases/2024-complete-series-4k"
+                                           "/discs/s01d02"), ("friends-1994", "2024-complete-series-4k", "s01d02"))
+        self.assertIsNone(discdb.parse_link("Dr. Strangelove"))
+        self.assertIsNone(discdb.parse_link("https://thediscdb.com/movies"))
+
+    def test_flat_discs_and_link_filter(self):
+        """The current query's shape: index, name and slug sit on each release disc."""
+        title = {"index": 0, "duration": "1:34:43", "size": 1, "sourceFile": "00800.mpls", "itemType": "MainMovie",
+                 "item": {"title": "Dr. Strangelove", "type": "Movie"}}
+        response = {"data": {"mediaItems": {"nodes": [{"title": "Dr. Strangelove", "year": 1964, "type": "Movie",
+            "slug": self.MEDIA, "releases": [{"title": "2021", "slug": self.RELEASE, "discs": [
+                {"index": 1, "name": "4K UHD", "slug": "4k-uhd", "format": "UHD", "titles": [title]},
+                {"index": 2, "name": "Blu-Ray", "slug": "blu-ray", "format": "Blu-ray", "titles": [title]}]}]}]}}}
+        discs = discdb.parse_search(response)
+        self.assertEqual([(d.disc_index, d.disc_slug, d.release_slug) for d in discs],
+                         [(1, "4k-uhd", self.RELEASE), (2, "blu-ray", self.RELEASE)])
+        self.assertIn("“4K UHD”", discs[0].label())
+        self.assertEqual(discdb.discs_for_link(discs, self.RELEASE, "blu-ray"), [discs[1]])
+        self.assertEqual(discdb.discs_for_link(discs, self.RELEASE, ""), discs)
+        self.assertEqual(discdb.discs_for_link(discs, "other", ""), [])
+
+
 class TextTest(unittest.TestCase):
     def test_safe_name_and_search_text(self):
         self.assertEqual(discdb.safe_name("Travel: Locations / Trivia?"), "Travel - Locations - Trivia")
