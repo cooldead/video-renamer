@@ -144,6 +144,15 @@ How Video Renamer was built. It was developed with Claude Code in one long sessi
 - **Tested:** unit tests for link parsing and filtering. Live: the 4K UHD link for the real Dr. Strangelove rips matched 12 of 14 files; Friends discs show as "Season 1, Disc 1" etc. The window was checked offscreen. A link was not tried by hand in the real window.
 - **Also found:** Escape From Alcatraz isn't in TheDiscDB at all, so a link can't help there.
 
+## 23. Discs that aren't ready or mounted yet (2026-10-24)
+- **Problem:** with two discs in, a Rip window sometimes said there was no disc. The user noticed it happened when a drive wasn't mounted yet and asked whether the app could mount the drives itself.
+- **Cause:** a disc that was just put in reads as "loading" in MakeMKV (drive state 3) with no disc name for a while. The app took the missing name as "no disc" and never looked again. The desktop mounts the disc once it has loaded, which is why the unmounted drives were the ones that failed. MakeMKV itself reads the drive directly and doesn't need the disc mounted.
+- **Built:**
+  - Before it lists the drives, the Rip window mounts any disc that's in a drive but not mounted (`lsblk`, then `udisksctl mount`, the same as the desktop does). Drives used by another Rip window are left alone. If `udisksctl` isn't there, it carries on without mounting.
+  - When no drive has a ready disc but one is loading, the window says "Waiting for the disc in … to load…" and looks again every 3 s for about a minute, then scans as usual. The refresh button starts the count over.
+  - The Flatpak runs `lsblk` and `udisksctl` on the host too.
+- **Tested:** unit tests for the loading state and for `lsblk` parsing (60 tests). The window was checked offscreen with fake `makemkvcon`, `lsblk` and `udisksctl` scripts: two "loading" answers, then the disc, and the scan started by itself. It was not tried with real discs, because both drives were ripping.
+
 ## Open items / ideas not done
 - **Whether the all-tracks profile rips every language** was confirmed on real rips (29/27 tracks). Removing tracks after a real multi-language rip has only been tested on short titles.
 - **The first two real rips (Indiana Jones, One Battle After Another)** still contain all their tracks; they were made before the matching fix.

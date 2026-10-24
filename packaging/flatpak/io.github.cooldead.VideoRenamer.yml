@@ -13,7 +13,7 @@ finish-args:
   - --socket=pulseaudio
   - --device=dri                  # GPU video decoding and drawing
   - --filesystem=host             # video folders, NAS mounts
-  # makemkvcon, mkvmerge, rsync, ffprobe and gio (Trash) run on the host (see host-tool.sh)
+  # makemkvcon, mkvmerge, rsync, ffprobe, gio (Trash), lsblk and udisksctl (mounting discs) run on the host (see host-tool.sh)
   - --talk-name=org.freedesktop.Flatpak
 cleanup:
   - '*.a'
@@ -104,7 +104,7 @@ modules:
     build-commands:
       - install -Dm755 host-tool.sh ${FLATPAK_DEST}/libexec/host-tool
       - mkdir -p ${FLATPAK_DEST}/bin
-      - for tool in makemkvcon mkvmerge rsync ffprobe gio; do ln -s ../libexec/host-tool ${FLATPAK_DEST}/bin/$tool; done
+      - for tool in makemkvcon mkvmerge rsync ffprobe gio lsblk udisksctl; do ln -s ../libexec/host-tool ${FLATPAK_DEST}/bin/$tool; done
     sources:
       - type: file
         path: host-tool.sh

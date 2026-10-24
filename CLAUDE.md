@@ -8,7 +8,7 @@ For the history of how and why things were built, see `docs/DEVELOPMENT_LOG.md`.
 
 ```sh
 ./run.sh [folder]          # the app
-python3 -m unittest        # unit tests (tests/, ~56), no GUI or network needed
+python3 -m unittest        # unit tests (tests/, ~60), no GUI or network needed
 ```
 - **System packages:** `pyside6 mpv python-mpv mkvtoolnix-cli rsync`, plus `makemkv` for ripping. No pip or virtualenv.
 - **Scope of the unit tests:** they cover the pure modules. The GUI was checked with throwaway scripts (not in the repo) that drive `MainWindow` directly. For those, set `XDG_CONFIG_HOME=<scratch>` so the user's real settings stay untouched.
@@ -51,6 +51,7 @@ python3 -m unittest        # unit tests (tests/, ~56), no GUI or network needed
   - "Forced only" subtitle tracks are dropped by MakeMKV when the disc has no forced subtitles. That's not an error.
   - If a normal ticked track is missing from the file, all tracks are kept and the report warns about it.
   - Title ids depend on `--minlength`, so scan and rip must use the same value.
+  - **Drive listing:** a disc that was just put in reads as state 3 (`DRIVE_LOADING`) with no name, so the Rip window looks again every 3 s (about a minute) instead of saying "no disc". Before each listing it mounts unmounted discs with `udisksctl` (MakeMKV doesn't need that, but it matches what the desktop does); a missing `udisksctl` is ignored.
   - The registration key is never stored by the app. Settings runs `makemkvcon reg`, and MakeMKV saves the key with its own settings, which the GUI shares. Key and evaluation problems are spotted by message text (`makemkv.KEY_PROBLEMS`) and explained after a failed scan or rip.
 - **Rip progress:** the top bar is the overall progress over all titles, weighted by size; the second bar is the current title, driven by bytes written once copying starts. MakeMKV's "preparing" phase (0 bytes written) is shown separately in the stats.
 - **Settings:** the Rip window must not silently change the default rip folder or minimum length; only Settings does. The export destination used moves to the top of the list.
@@ -65,7 +66,7 @@ python3 -m unittest        # unit tests (tests/, ~56), no GUI or network needed
 - **App id** `io.github.cooldead.VideoRenamer` (`main_window.APP_ID`): desktop file, icon and metainfo in `data/`, and the Flatpak id. `setDesktopFileName` uses it, so Wayland matches the window to the installed desktop file.
 - `packaging/install.sh <destdir> <prefix>` is the one install step for both packages. The code goes into `<prefix>/lib/video-renamer`, not site-packages, so a Python upgrade doesn't break the pacman package. The launcher is `<prefix>/bin/video-renamer`.
 - **pacman:** `packaging/arch/PKGBUILD` builds from the `v$pkgver` git tag and runs the unit tests. To test before tagging, use a copy whose `prepare()` rsyncs the working tree.
-- **Flatpak:** `packaging/flatpak/`, on io.qt.PySide.BaseApp and KDE 6.11. libmpv is built with LuaJIT, because `osc=no` fails without Lua. `host-tool.sh` is installed as makemkvcon, mkvmerge, rsync, ffprobe and gio, and runs them on the host with `flatpak-spawn --host`. Exit 127 = not on the host, which `tool_version` reports as not found.
+- **Flatpak:** `packaging/flatpak/`, on io.qt.PySide.BaseApp and KDE 6.11. libmpv is built with LuaJIT, because `osc=no` fails without Lua. `host-tool.sh` is installed as makemkvcon, mkvmerge, rsync, ffprobe, gio, lsblk and udisksctl, and runs them on the host with `flatpak-spawn --host`. Exit 127 = not on the host, which `tool_version` reports as not found.
   - **Stopping:** use `rip_dialog.stop_process` (SIGTERM, then SIGKILL). flatpak-spawn passes SIGTERM on to the host program but can't pass SIGKILL, so a bare `kill()` would leave the rip or copy running. Tested.
   - **Trash:** `QFile.moveToTrash` fails in the sandbox; `main_window.move_to_trash` then uses `gio trash` (on the host).
   - Host programs start in the app's working folder; the wrapper switches to `$HOME` when that folder is `/app` or `/usr`, which don't exist on the host.

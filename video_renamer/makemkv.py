@@ -10,6 +10,7 @@ See https://www.makemkv.com/developers/usage.txt. Nothing here touches Qt.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -81,6 +82,11 @@ def duration_seconds(text: str) -> int:
     return seconds
 
 
+# MakeMKV's drive state while it is still reading a disc that was just put in
+# (AP_DriveStateLoading). The disc name is empty until it's done.
+DRIVE_LOADING = 3
+
+
 @dataclass
 class Drive:
     index: int
@@ -92,6 +98,10 @@ class Drive:
     @property
     def has_disc(self) -> bool:
         return bool(self.disc_label)
+
+    @property
+    def loading(self) -> bool:
+        return self.state == DRIVE_LOADING and not self.disc_label
 
     def label(self) -> str:
         disc = self.disc_label or "no disc"
@@ -325,6 +335,26 @@ def safe_folder_name(name: str) -> str:
 def reg_args(key: str) -> list[str]:
     """makemkvcon stores the key in its own settings (the ones the GUI uses)."""
     return ["reg", key.strip()]
+
+
+def lsblk_args() -> list[str]:
+    return ["-J", "-o", "PATH,TYPE,FSTYPE,MOUNTPOINT"]
+
+
+def unmounted_discs(lsblk_json: str) -> list[str]:
+    """Optical drives holding a disc with a file system that isn't mounted yet,
+    from lsblk's JSON. An empty drive has no file system."""
+    try:
+        devices = json.loads(lsblk_json).get("blockdevices", [])
+    except (ValueError, AttributeError):
+        return []
+    return [d["path"] for d in devices
+            if d.get("type") == "rom" and d.get("fstype") and not d.get("mountpoint") and d.get("path")]
+
+
+def mount_args(device: str) -> list[str]:
+    """udisksctl mounts like the desktop does when a disc goes in (no password for the logged-in user)."""
+    return ["mount", "--no-user-interaction", "-b", device]
 
 
 def drives_args() -> list[str]:

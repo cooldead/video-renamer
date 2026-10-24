@@ -55,6 +55,25 @@ class ParseInfoTest(unittest.TestCase):
         self.assertEqual(len(drives), 1)
         self.assertEqual((drives[0].index, drives[0].device, drives[0].disc_label), (0, "/dev/sr0", "INDIANA_JONES_LOST_ARK"))
         self.assertTrue(drives[0].has_disc)
+        self.assertFalse(drives[0].loading)
+
+    def test_drive_still_loading(self):
+        lines = ['DRV:0,3,999,12,"BD-RE Example Optical Drive 1.00","","/dev/sr0"',
+                 'DRV:1,0,999,0,"BD-RE Example Optical Drive 1.00","","/dev/sr1"']
+        loading, empty = makemkv.parse_drives(lines)
+        self.assertTrue(loading.loading and not loading.has_disc)
+        self.assertFalse(empty.loading or empty.has_disc)
+
+    def test_unmounted_discs(self):
+        lsblk = json.dumps({"blockdevices": [
+            {"path": "/dev/sr0", "type": "rom", "fstype": "udf", "mountpoint": None},         # disc, not mounted
+            {"path": "/dev/sr1", "type": "rom", "fstype": "udf", "mountpoint": "/run/media/x/DISC"},
+            {"path": "/dev/sr2", "type": "rom", "fstype": None, "mountpoint": None},          # empty drive
+            {"path": "/dev/sda1", "type": "part", "fstype": "ext4", "mountpoint": None},
+        ]})
+        self.assertEqual(makemkv.unmounted_discs(lsblk), ["/dev/sr0"])
+        self.assertEqual(makemkv.unmounted_discs("not json"), [])
+        self.assertEqual(makemkv.mount_args("/dev/sr0"), ["mount", "--no-user-interaction", "-b", "/dev/sr0"])
 
     def test_default_selection_like_makemkv(self):
         tracks = self.disc.titles[0].tracks

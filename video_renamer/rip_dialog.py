@@ -25,6 +25,8 @@ from .makemkv import Title
 TRACK_ICONS = {"video": "video-x-generic", "audio": "audio-x-generic", "subtitle": "text-x-generic"}
 TRACK_KIND_NAMES = {"video": "Video", "audio": "Audio", "subtitle": "Subtitles", "other": "Other"}
 ID_ROLE = Qt.ItemDataRole.UserRole + 1  # (title id, track id or None)
+LOAD_WAIT_MS = 3000   # between looks at a drive whose disc is still loading
+LOAD_TRIES = 20       # about a minute
 
 
 def human_bytes(size: int) -> str:
@@ -63,7 +65,14 @@ class RipDialog(QDialog):
         self.disc: makemkv.Disc | None = None
         self.drives: list[makemkv.Drive] = []
         self._process: QProcess | None = None
-        self._phase = "idle"              # idle / drives / scan / rip / strip
+        self._phase = "idle"              # idle / mount / drives / scan / rip / strip
+        self._mount_queue: list[str] = []
+        # A disc that was just put in reads as "loading" for a while; look again until it's ready.
+        self._load_tries = 0
+        self._wait_timer = QTimer(self)
+        self._wait_timer.setSingleShot(True)
+        self._wait_timer.setInterval(LOAD_WAIT_MS)
+        self._wait_timer.timeout.connect(lambda: self.list_drives(waiting=True))
         self._buffer = ""
         self._lines: list[str] = []
         self._queue: list[tuple[Title, list[int]]] = []
@@ -228,6 +237,11 @@ class RipDialog(QDialog):
                 self._report["empty_forced"] = self._report.get("empty_forced", 0) + 1
 
     def _process_error(self, error) -> None:
+        if error == QProcess.ProcessError.FailedToStart and self._phase == "mount":
+            # No udisksctl: MakeMKV doesn't need the disc mounted, so carry on.
+            self._process = None
+            self._mount_next()
+            return
         if error == QProcess.ProcessError.FailedToStart:
             program = self._process.program() if self._process else "program"
             self.log.appendPlainText(f"Could not start {program}.")
@@ -244,7 +258,9 @@ class RipDialog(QDialog):
         self._stats_timer.stop()
         phase, self._phase = self._phase, "idle"
         self._process = None
-        if phase == "drives":
+        if phase == "mount":
+            self._mount_next()
+        elif phase == "drives":
             self._drives_listed()
         elif phase == "scan":
             self._scanned(exit_code, crashed)
@@ -264,7 +280,7 @@ class RipDialog(QDialog):
         self.step_progress.setRange(0, 1000)
         # Progress bars only while something runs; the title bar only while ripping.
         ripping = busy and self._phase in ("rip", "strip")
-        self.step_progress.setVisible(busy and self._phase != "drives")
+        self.step_progress.setVisible(busy and self._phase not in ("mount", "drives"))
         self.title_progress.setVisible(ripping or (self._phase in ("rip", "strip") and busy))
         if not busy:
             self.step_progress.setValue(0)
@@ -301,9 +317,32 @@ class RipDialog(QDialog):
 
     # --- drives and scanning -----------------------------------------------
 
-    def list_drives(self) -> None:
-        self.disc_label.setText("Looking for drives…")
-        self._run("drives", self._makemkvcon, makemkv.drives_args())
+    def list_drives(self, waiting: bool = False) -> None:
+        """Mount discs the desktop hasn't mounted yet, then ask MakeMKV for the drives."""
+        self._wait_timer.stop()
+        if not waiting:
+            self._load_tries = 0
+        if self._phase != "idle":
+            return
+        if not waiting:
+            self.disc_label.setText("Looking for drives…")
+        self._mount_queue = [d for d in self._unmounted_discs() if d not in self._devices_in_use()]
+        self._mount_next()
+
+    def _unmounted_discs(self) -> list[str]:
+        try:
+            result = subprocess.run(["lsblk", *makemkv.lsblk_args()], capture_output=True, text=True, timeout=5)
+        except (OSError, subprocess.SubprocessError):
+            return []
+        return makemkv.unmounted_discs(result.stdout) if result.returncode == 0 else []
+
+    def _mount_next(self) -> None:
+        if self._mount_queue:
+            device = self._mount_queue.pop(0)
+            self.log.appendPlainText(f"Mounting the disc in {device}")
+            self._run("mount", "udisksctl", makemkv.mount_args(device))
+        else:
+            self._run("drives", self._makemkvcon, makemkv.drives_args())
 
     def _drives_listed(self) -> None:
         self.drives = makemkv.parse_drives(self._lines)
@@ -313,7 +352,13 @@ class RipDialog(QDialog):
         in_use = self._devices_in_use()
         with_disc = [i for i, d in enumerate(self.drives) if d.has_disc]
         free = [i for i in with_disc if self.drives[i].device not in in_use]
-        if not self.drives:
+        loading = [i for i, d in enumerate(self.drives) if d.loading and d.device not in in_use]
+        if not free and loading and self._load_tries < LOAD_TRIES:
+            self._load_tries += 1
+            self.drive_combo.setCurrentIndex(loading[0])
+            self.disc_label.setText(f"Waiting for the disc in {self.drives[loading[0]].device} to load…")
+            self._wait_timer.start()
+        elif not self.drives:
             self.disc_label.setText("No optical drive found.")
         elif not with_disc:
             self.disc_label.setText("No disc in the drive. Insert one and press the refresh button.")
@@ -749,6 +794,7 @@ class RipDialog(QDialog):
         self._set_busy(False)
 
     def closeEvent(self, event) -> None:
+        self._wait_timer.stop()
         if self._process is not None and self._phase in ("rip", "strip"):
             if QMessageBox.question(self, "Rip Disc", "A rip is running. Stop it and close?") \
                     != QMessageBox.StandardButton.Yes:
