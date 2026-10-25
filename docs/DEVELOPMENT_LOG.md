@@ -161,6 +161,15 @@ How Video Renamer was built. It was developed with Claude Code in one long sessi
   - When MakeMKV says "Failed to open disc", the window waits 15 s and runs the same scan or title again, up to 3 tries in all, and logs each try. Only then is the title counted as failed. Stop works while it waits.
 - **Tested:** unit tests (61). Offscreen with a fake `makemkvcon`: a title that fails twice rips on its third try; one that keeps failing is reported after 3 tries; the commands use `dev:`. Not yet tried with two real discs, so it isn't proven that `dev:` alone stops the failures; the retries are there in case it doesn't.
 
+## 25. Each MakeMKV run sees only its own drive (2026-10-24)
+- **Problem:** with `dev:` and the retries from entry 24, Sinners titles still failed with "Failed to open disc" while the other drive ripped Inglourious Basterds. The other drive was in bad shape at the time (USB resets, read errors, single commands taking 27 s). A plain drive listing took about 2 minutes.
+- **Cause:** MakeMKV checks every drive when it starts, even when told to use one by device path. The stuck Sinners process had the other drive's SCSI node open and was waiting on it, while the Sinners drive read nothing. After about 2 minutes MakeMKV gave up. Two rips at once worked before because a healthy busy drive answers that check quickly.
+- **Built:**
+  - Scans and rips run inside `bwrap` with a fresh `/dev` holding only the drive's own `/dev/srN` and its `/dev/sgN` (from sysfs). The rest of the system is the same as outside. The drive listing still sees every drive.
+  - Stopping: bwrap doesn't pass SIGTERM on, but `--die-with-parent` kills MakeMKV when bwrap stops.
+  - If `bwrap` isn't installed, or prints an error of its own, the window runs MakeMKV the old way (after a failed bwrap it retries that step without it). Not used in the Flatpak, where bwrap can't run inside the sandbox.
+- **Tested:** unit tests (62). A real drive listing in the sandbox saw only the Sinners drive and took 6.5 s, while a normal listing was taking about 2 minutes. Offscreen with fake tools: the scan and rips saw only `/dev/sr1` and `/dev/sg2`; a failing bwrap fell back and still ripped; Stop ended both bwrap and the program. Not yet a full real rip on two drives.
+
 ## Open items / ideas not done
 - **Whether the all-tracks profile rips every language** was confirmed on real rips (29/27 tracks). Removing tracks after a real multi-language rip has only been tested on short titles.
 - **The first two real rips (Indiana Jones, One Battle After Another)** still contain all their tracks; they were made before the matching fix.

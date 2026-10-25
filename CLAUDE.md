@@ -8,7 +8,7 @@ For the history of how and why things were built, see `docs/DEVELOPMENT_LOG.md`.
 
 ```sh
 ./run.sh [folder]          # the app
-python3 -m unittest        # unit tests (tests/, ~61), no GUI or network needed
+python3 -m unittest        # unit tests (tests/, ~62), no GUI or network needed
 ```
 - **System packages:** `pyside6 mpv python-mpv mkvtoolnix-cli rsync`, plus `makemkv` for ripping. No pip or virtualenv.
 - **Scope of the unit tests:** they cover the pure modules. The GUI was checked with throwaway scripts (not in the repo) that drive `MainWindow` directly. For those, set `XDG_CONFIG_HOME=<scratch>` so the user's real settings stay untouched.
@@ -52,6 +52,7 @@ python3 -m unittest        # unit tests (tests/, ~61), no GUI or network needed
   - If a normal ticked track is missing from the file, all tracks are kept and the report warns about it.
   - Title ids depend on `--minlength`, so scan and rip must use the same value.
   - **Drive source:** scans and rips use `dev:/dev/srN` (`makemkv.source`), not `disc:N`: with a second drive busy, `disc:N` runs failed with "Failed to open disc". That message makes the window retry the same step (15 s wait, 3 tries in all; phase `wait`).
+  - **One drive per MakeMKV run:** MakeMKV checks every drive at start-up even with `dev:`, and a slow second drive stalled it into "Failed to open disc". Scans and rips run in `bwrap` with a `/dev` holding only that drive's `srN` and `sgN` (`makemkv.isolated_args`, `RipDialog._run_makemkv`). There's a fallback to a plain run when bwrap is missing or fails, and it's skipped in the Flatpak. bwrap doesn't pass SIGTERM on; `--die-with-parent` ends MakeMKV on Stop.
   - **Drive listing:** a disc that was just put in reads as state 3 (`DRIVE_LOADING`) with no name, so the Rip window looks again every 3 s (about a minute) instead of saying "no disc". Before each listing it mounts unmounted discs with `udisksctl` (MakeMKV doesn't need that, but it matches what the desktop does); a missing `udisksctl` is ignored.
   - The registration key is never stored by the app. Settings runs `makemkvcon reg`, and MakeMKV saves the key with its own settings, which the GUI shares. Key and evaluation problems are spotted by message text (`makemkv.KEY_PROBLEMS`) and explained after a failed scan or rip.
 - **Rip progress:** the top bar is the overall progress over all titles, weighted by size; the second bar is the current title, driven by bytes written once copying starts. MakeMKV's "preparing" phase (0 bytes written) is shown separately in the stats.

@@ -185,6 +185,16 @@ class MiscTest(unittest.TestCase):
         self.assertTrue(makemkv.is_open_failure("Failed to open disc"))
         self.assertFalse(makemkv.is_open_failure("Operation successfully completed"))
 
+    def test_isolated_drive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "block" / "sr1" / "device" / "scsi_generic" / "sg2").mkdir(parents=True)
+            self.assertEqual(makemkv.generic_device("/dev/sr1", Path(tmp)), "/dev/sg2")
+            self.assertIsNone(makemkv.generic_device("/dev/sr0", Path(tmp)))
+        args = makemkv.isolated_args("makemkvcon", ["info", "dev:/dev/sr1"], ["/dev/sr1", "/dev/sg2"])
+        self.assertEqual(args[:5], ["--dev-bind", "/", "/", "--dev", "/dev"])
+        self.assertIn("--dev-bind /dev/sg2 /dev/sg2", " ".join(args))
+        self.assertEqual(args[args.index("--") + 1:], ["makemkvcon", "info", "dev:/dev/sr1"])
+
     def test_preferred_language(self):
         with tempfile.TemporaryDirectory() as tmp:
             conf = Path(tmp) / "settings.conf"

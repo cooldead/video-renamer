@@ -368,6 +368,30 @@ def source(drive: Drive) -> str:
     return f"dev:{drive.device}" if drive.device else f"disc:{drive.index}"
 
 
+BWRAP = "bwrap"
+
+
+def generic_device(device: str, sys_root: Path = Path("/sys")) -> str | None:
+    """The SCSI generic node (/dev/sgN) of a drive like /dev/sr1: MakeMKV
+    opens both. None when sysfs doesn't say."""
+    folder = sys_root / "block" / Path(device).name / "device" / "scsi_generic"
+    try:
+        names = sorted(path.name for path in folder.iterdir())
+    except OSError:
+        return None
+    return f"/dev/{names[0]}" if names else None
+
+
+def isolated_args(program: str, args: list[str], devices: list[str]) -> list[str]:
+    """bwrap arguments that run the program with only these drives in /dev.
+    MakeMKV checks every drive when it starts, even with a dev: source, and
+    waits for each one; a busy or failing second drive held every title up
+    for about 2 minutes, then it gave up with "Failed to open disc".
+    bwrap doesn't pass SIGTERM on: stopping it kills the program (--die-with-parent)."""
+    binds = [arg for device in devices for arg in ("--dev-bind", device, device)]
+    return ["--dev-bind", "/", "/", "--dev", "/dev", *binds, "--die-with-parent", "--", program, *args]
+
+
 # MakeMKV's message when it can't get at the drive; worth another try a little later.
 OPEN_FAILED = "failed to open disc"
 

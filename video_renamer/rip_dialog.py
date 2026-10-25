@@ -82,6 +82,9 @@ class RipDialog(QDialog):
         self._retry_timer.setSingleShot(True)
         self._retry_timer.setInterval(OPEN_WAIT_MS)
         self._retry_timer.timeout.connect(self._retry)
+        # Scans and rips see only their own drive (makemkv.isolated_args). Not in
+        # the Flatpak (bwrap can't nest there); off for this window if bwrap fails.
+        self._isolate = shutil.which(makemkv.BWRAP) is not None and not Path("/.flatpak-info").exists()
         self._buffer = ""
         self._lines: list[str] = []
         self._queue: list[tuple[Title, list[int]]] = []
@@ -210,6 +213,15 @@ class RipDialog(QDialog):
             self._stats_timer.start()
         process.start(program, args)
 
+    def _run_makemkv(self, phase: str, args: list[str]) -> None:
+        """A scan or rip of the current drive, which is all MakeMKV gets to see."""
+        drive = self.drives[self.drive_combo.currentIndex()]
+        if self._isolate and drive.device:
+            devices = [drive.device, *filter(None, [makemkv.generic_device(drive.device)])]
+            self._run(phase, makemkv.BWRAP, makemkv.isolated_args(self._makemkvcon, args, devices))
+        else:
+            self._run(phase, self._makemkvcon, args)
+
     def _read_output(self) -> None:
         if self._process is None:
             return
@@ -227,6 +239,12 @@ class RipDialog(QDialog):
                 self.step_progress.setValue(self._strip_percent)
             elif line.startswith(("#GUI#warning", "#GUI#error")):
                 self.log.appendPlainText(line.split(" ", 1)[-1])
+            return
+        if line.startswith(makemkv.BWRAP + ": "):
+            # bwrap itself failed (e.g. no user namespaces): try again without it.
+            self.log.appendPlainText(f"{line} (running MakeMKV without hiding the other drives)")
+            self._isolate = False
+            self._open_failed = True
             return
         progress = makemkv.parse_progress(line)
         if progress is None:
@@ -421,7 +439,7 @@ class RipDialog(QDialog):
         self.tree.clear()
         self.disc_label.setText(f"Reading {drive.disc_label or 'disc'}… (this can take a minute)")
         self.status.setText("Scanning disc")
-        self._run("scan", self._makemkvcon, makemkv.info_args(makemkv.source(drive), self.min_length.value()))
+        self._run_makemkv("scan", makemkv.info_args(makemkv.source(drive), self.min_length.value()))
 
     def _scanned(self, exit_code: int, crashed: bool) -> None:
         disc = makemkv.parse_info(self._lines)
@@ -672,9 +690,8 @@ class RipDialog(QDialog):
         cache = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.CacheLocation)
         profile = makemkv.write_profile(Path(cache) if cache else Path.home() / ".cache" / "video-renamer")
         drive = self.drives[self.drive_combo.currentIndex()]
-        self._run("rip", self._makemkvcon,
-                  makemkv.rip_args(makemkv.source(drive), title.id, self._output, self._scanned_min_length, profile,
-                                   app_settings.get(self.settings, "makemkv_cache_mb")))
+        self._run_makemkv("rip", makemkv.rip_args(makemkv.source(drive), title.id, self._output, self._scanned_min_length,
+                                                  profile, app_settings.get(self.settings, "makemkv_cache_mb")))
 
     def _title_ripped(self, exit_code: int, crashed: bool) -> None:
         title, tracks = self._current
