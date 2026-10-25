@@ -27,6 +27,8 @@ TRACK_KIND_NAMES = {"video": "Video", "audio": "Audio", "subtitle": "Subtitles",
 ID_ROLE = Qt.ItemDataRole.UserRole + 1  # (title id, track id or None)
 LOAD_WAIT_MS = 3000   # between looks at a drive whose disc is still loading
 LOAD_TRIES = 20       # about a minute
+OPEN_WAIT_MS = 15000  # before trying again when MakeMKV couldn't open the disc
+OPEN_TRIES = 3        # tries per title (or scan) in all
 
 
 def human_bytes(size: int) -> str:
@@ -65,7 +67,7 @@ class RipDialog(QDialog):
         self.disc: makemkv.Disc | None = None
         self.drives: list[makemkv.Drive] = []
         self._process: QProcess | None = None
-        self._phase = "idle"              # idle / mount / drives / scan / rip / strip
+        self._phase = "idle"              # idle / mount / drives / scan / rip / strip / wait
         self._mount_queue: list[str] = []
         # A disc that was just put in reads as "loading" for a while; look again until it's ready.
         self._load_tries = 0
@@ -73,6 +75,13 @@ class RipDialog(QDialog):
         self._wait_timer.setSingleShot(True)
         self._wait_timer.setInterval(LOAD_WAIT_MS)
         self._wait_timer.timeout.connect(lambda: self.list_drives(waiting=True))
+        # "Failed to open disc": the same scan or title is tried again a little later.
+        self._open_failed = False
+        self._open_tries = 1
+        self._retry_timer = QTimer(self)
+        self._retry_timer.setSingleShot(True)
+        self._retry_timer.setInterval(OPEN_WAIT_MS)
+        self._retry_timer.timeout.connect(self._retry)
         self._buffer = ""
         self._lines: list[str] = []
         self._queue: list[tuple[Title, list[int]]] = []
@@ -184,6 +193,7 @@ class RipDialog(QDialog):
         self._lines = []
         if phase in ("drives", "scan"):
             self._key_problem = None
+        self._open_failed = False
         process = QProcess(self)
         process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         process.readyReadStandardOutput.connect(self._read_output)
@@ -233,6 +243,8 @@ class RipDialog(QDialog):
             self.log.appendPlainText(progress.message)
             if makemkv.is_key_problem(progress.message):
                 self._key_problem = progress.message
+            if self._phase in ("scan", "rip") and makemkv.is_open_failure(progress.message):
+                self._open_failed = True
             if self._phase == "rip" and "turned out to be empty" in progress.message:
                 self._report["empty_forced"] = self._report.get("empty_forced", 0) + 1
 
@@ -271,6 +283,31 @@ class RipDialog(QDialog):
         if self._phase == "idle":
             self._set_busy(False)
 
+    def _try_again_later(self, what: str) -> bool:
+        """After "Failed to open disc": wait and run the same step again, up to
+        OPEN_TRIES in all. Returns False when the tries are used up."""
+        if not self._open_failed or self._open_tries >= OPEN_TRIES:
+            return False
+        self._open_tries += 1
+        self.log.appendPlainText(f"MakeMKV could not open the disc. Trying {what} again in {OPEN_WAIT_MS // 1000} s "
+                                 f"(try {self._open_tries} of {OPEN_TRIES}).")
+        self.status.setText(f"Waiting to try {what} again…")
+        self._phase = "wait"
+        self._set_busy(True)
+        self._retry_timer.start()
+        return True
+
+    def _retry(self) -> None:
+        if self._phase != "wait":
+            return
+        self._phase = "idle"
+        if self._current is not None:
+            self._queue.insert(0, self._current)
+            self._current = None
+            self._next_title()
+        else:
+            self.scan(again=True)
+
     def _set_busy(self, busy: bool) -> None:
         for widget in (self.drive_combo, self.refresh_button, self.min_length, self.scan_button,
                        self.tree, self.output_edit):
@@ -279,9 +316,9 @@ class RipDialog(QDialog):
         self.stop_button.setEnabled(busy)
         self.step_progress.setRange(0, 1000)
         # Progress bars only while something runs; the title bar only while ripping.
-        ripping = busy and self._phase in ("rip", "strip")
+        ripping = busy and (self._phase in ("rip", "strip") or (self._phase == "wait" and self._current is not None))
         self.step_progress.setVisible(busy and self._phase not in ("mount", "drives"))
-        self.title_progress.setVisible(ripping or (self._phase in ("rip", "strip") and busy))
+        self.title_progress.setVisible(ripping)
         if not busy:
             self.step_progress.setValue(0)
 
@@ -302,7 +339,7 @@ class RipDialog(QDialog):
 
     def claims_drive(self) -> bool:
         """This window is using its drive: scanning, ripping, or holding a scanned disc."""
-        return self.device is not None and (self._phase in ("scan", "rip", "strip") or self.disc is not None)
+        return self.device is not None and (self._phase in ("scan", "rip", "strip", "wait") or self.disc is not None)
 
     def claimed_output(self) -> Path | None:
         if self.disc is None or not self.output_edit.text().strip():
@@ -370,9 +407,11 @@ class RipDialog(QDialog):
             self.drive_combo.setCurrentIndex(free[0])
             self.scan()
 
-    def scan(self) -> None:
+    def scan(self, again: bool = False) -> None:
         if not self.drives:
             return
+        if not again:
+            self._open_tries = 1
         drive = self.drives[self.drive_combo.currentIndex()]
         if drive.device in self._devices_in_use():
             QMessageBox.information(self, "Rip Disc", f"{drive.device} is already used by another Rip window.")
@@ -382,10 +421,12 @@ class RipDialog(QDialog):
         self.tree.clear()
         self.disc_label.setText(f"Reading {drive.disc_label or 'disc'}… (this can take a minute)")
         self.status.setText("Scanning disc")
-        self._run("scan", self._makemkvcon, makemkv.info_args(drive.index, self.min_length.value()))
+        self._run("scan", self._makemkvcon, makemkv.info_args(makemkv.source(drive), self.min_length.value()))
 
     def _scanned(self, exit_code: int, crashed: bool) -> None:
         disc = makemkv.parse_info(self._lines)
+        if (crashed or not disc.titles) and self._try_again_later("reading the disc"):
+            return
         if crashed or not disc.titles:
             self.disc_label.setText("Could not read the disc (see the log below).")
             self.status.setText("")
@@ -605,6 +646,7 @@ class RipDialog(QDialog):
         self._done_titles = 0
         self._failures = []
         self._key_problem = None
+        self._open_tries = 1
         self._reports = []
         self._total_bytes = sum(max(title.size_bytes, 1) for title, _ in chosen)
         self._done_bytes = 0
@@ -631,7 +673,7 @@ class RipDialog(QDialog):
         profile = makemkv.write_profile(Path(cache) if cache else Path.home() / ".cache" / "video-renamer")
         drive = self.drives[self.drive_combo.currentIndex()]
         self._run("rip", self._makemkvcon,
-                  makemkv.rip_args(drive.index, title.id, self._output, self._scanned_min_length, profile,
+                  makemkv.rip_args(makemkv.source(drive), title.id, self._output, self._scanned_min_length, profile,
                                    app_settings.get(self.settings, "makemkv_cache_mb")))
 
     def _title_ripped(self, exit_code: int, crashed: bool) -> None:
@@ -639,6 +681,10 @@ class RipDialog(QDialog):
         path = self._output / title.output_file
         self._report["rip_seconds"] = time.monotonic() - self._phase_started
         if crashed or exit_code != 0 or not path.exists():
+            if self._try_again_later(f"title {title.id}"):
+                if path.exists():
+                    path.unlink()  # a partial file would stop the next try
+                return
             self._failures.append(f"Title {title.id}: MakeMKV failed (exit code {exit_code})")
             self._report["problem"] = f"MakeMKV failed (exit code {exit_code}); see the log"
             self.log.appendPlainText(self._failures[-1])
@@ -718,6 +764,7 @@ class RipDialog(QDialog):
         self._title_done()
 
     def _title_done(self) -> None:
+        self._open_tries = 1
         if self._current is not None:
             self._done_bytes += max(self._current[0].size_bytes, 1)
         if self._report:
@@ -765,7 +812,7 @@ class RipDialog(QDialog):
         box.show()
 
     def stop(self) -> None:
-        if self._process is None:
+        if self._process is None and self._phase != "wait":
             return
         if QMessageBox.question(self, "Rip Disc", "Stop ripping? The unfinished file is deleted.") \
                 != QMessageBox.StandardButton.Yes:
@@ -774,6 +821,7 @@ class RipDialog(QDialog):
 
     def _abort(self) -> None:
         phase = self._phase
+        self._retry_timer.stop()
         self._stats_timer.stop()
         self._queue = []
         process, self._process = self._process, None
@@ -795,6 +843,8 @@ class RipDialog(QDialog):
 
     def closeEvent(self, event) -> None:
         self._wait_timer.stop()
+        if self._phase == "wait":
+            self._abort()
         if self._process is not None and self._phase in ("rip", "strip"):
             if QMessageBox.question(self, "Rip Disc", "A rip is running. Stop it and close?") \
                     != QMessageBox.StandardButton.Yes:

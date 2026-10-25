@@ -153,6 +153,14 @@ How Video Renamer was built. It was developed with Claude Code in one long sessi
   - The Flatpak runs `lsblk` and `udisksctl` on the host too.
 - **Tested:** unit tests for the loading state and for `lsblk` parsing (60 tests). The window was checked offscreen with fake `makemkvcon`, `lsblk` and `udisksctl` scripts: two "loading" answers, then the disc, and the scan started by itself. It was not tried with real discs, because both drives were ripping.
 
+## 24. Titles failing with "Failed to open disc" while the other drive rips (2026-10-24)
+- **Problem:** with two discs ripping at once, Sinners came out with only 2 of its 14 titles. All 14 were queued. Titles 1 and 3–13 each ended after about 2 minutes with MakeMKV's "Failed to open disc" (exit code 11). The other drive (Inglourious Basterds) ripped all its titles.
+- **Findings:** no kernel errors on the Sinners drive (USB resets were logged only on the other drive). The Sinners titles that worked started right when the other drive had just finished a title; the ones started while the other drive was mid-title failed. The app picked the drive by its place in MakeMKV's drive list (`disc:N`).
+- **Built:**
+  - Scans and rips name the drive by its device path (`dev:/dev/srN`, `makemkv.source`). A scan of Sinners by `dev:` gave the same 14 titles, ids and file names as `disc:0`.
+  - When MakeMKV says "Failed to open disc", the window waits 15 s and runs the same scan or title again, up to 3 tries in all, and logs each try. Only then is the title counted as failed. Stop works while it waits.
+- **Tested:** unit tests (62). Offscreen with a fake `makemkvcon`: a title that fails twice rips on its third try; one that keeps failing is reported after 3 tries; the commands use `dev:`. Not yet tried with two real discs, so it isn't proven that `dev:` alone stops the failures; the retries are there in case it doesn't.
+
 ## Open items / ideas not done
 - **Whether the all-tracks profile rips every language** was confirmed on real rips (29/27 tracks). Removing tracks after a real multi-language rip has only been tested on short titles.
 - **The first two real rips (Indiana Jones, One Battle After Another)** still contain all their tracks; they were made before the matching fix.

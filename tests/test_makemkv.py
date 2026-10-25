@@ -174,9 +174,16 @@ class MiscTest(unittest.TestCase):
             self.assertIn('defaultSelection="+sel:all"', path.read_text())
 
     def test_rip_args(self):
-        args = makemkv.rip_args(0, 3, Path("/out"), 120, Path("/p.xml"))
-        self.assertEqual(args, ["-r", "--progress=-same", "--minlength=120", "--profile=/p.xml", "mkv", "disc:0", "3", "/out"])
-        self.assertIn("--cache=256", makemkv.rip_args(0, 3, Path("/out"), 120, Path("/p.xml"), cache_mb=256))
+        args = makemkv.rip_args("dev:/dev/sr1", 3, Path("/out"), 120, Path("/p.xml"))
+        self.assertEqual(args, ["-r", "--progress=-same", "--minlength=120", "--profile=/p.xml", "mkv", "dev:/dev/sr1", "3", "/out"])
+        self.assertIn("--cache=256", makemkv.rip_args("dev:/dev/sr1", 3, Path("/out"), 120, Path("/p.xml"), cache_mb=256))
+        self.assertEqual(makemkv.info_args("dev:/dev/sr1", 120)[-2:], ["info", "dev:/dev/sr1"])
+
+    def test_source_and_open_failure(self):
+        self.assertEqual(makemkv.source(makemkv.Drive(0, 2, "Drive", "SINNERS", "/dev/sr1")), "dev:/dev/sr1")
+        self.assertEqual(makemkv.source(makemkv.Drive(2, 2, "Drive", "DISC", "")), "disc:2")
+        self.assertTrue(makemkv.is_open_failure("Failed to open disc"))
+        self.assertFalse(makemkv.is_open_failure("Operation successfully completed"))
 
     def test_preferred_language(self):
         with tempfile.TemporaryDirectory() as tmp:

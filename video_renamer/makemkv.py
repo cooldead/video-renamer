@@ -361,15 +361,30 @@ def drives_args() -> list[str]:
     return ["-r", "--cache=1", "info", "disc:9999"]
 
 
-def info_args(drive: int, min_length: int) -> list[str]:
-    return ["-r", "--progress=-same", "--cache=1", f"--minlength={min_length}", "info", f"disc:{drive}"]
+def source(drive: Drive) -> str:
+    """The drive by its device path rather than its place in MakeMKV's drive
+    list ("disc:N"): with a second drive busy ripping, "disc:N" runs kept
+    failing with "Failed to open disc". Same titles either way."""
+    return f"dev:{drive.device}" if drive.device else f"disc:{drive.index}"
 
 
-def rip_args(drive: int, title: int, out_dir: Path, min_length: int, profile: Path, cache_mb: int = 0) -> list[str]:
+# MakeMKV's message when it can't get at the drive; worth another try a little later.
+OPEN_FAILED = "failed to open disc"
+
+
+def is_open_failure(message: str) -> bool:
+    return OPEN_FAILED in message.lower()
+
+
+def info_args(source: str, min_length: int) -> list[str]:
+    return ["-r", "--progress=-same", "--cache=1", f"--minlength={min_length}", "info", source]
+
+
+def rip_args(source: str, title: int, out_dir: Path, min_length: int, profile: Path, cache_mb: int = 0) -> list[str]:
     # Title ids depend on --minlength, so it must match the scan.
     cache = [f"--cache={cache_mb}"] if cache_mb > 0 else []
     return ["-r", "--progress=-same", *cache, f"--minlength={min_length}", f"--profile={profile}",
-            "mkv", f"disc:{drive}", str(title), str(out_dir)]
+            "mkv", source, str(title), str(out_dir)]
 
 
 def write_profile(folder: Path) -> Path:
