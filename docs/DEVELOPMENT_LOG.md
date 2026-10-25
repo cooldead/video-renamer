@@ -159,7 +159,7 @@ How Video Renamer was built. It was developed with Claude Code in one long sessi
 - **Built:**
   - Scans and rips name the drive by its device path (`dev:/dev/srN`, `makemkv.source`). A scan of Sinners by `dev:` gave the same 14 titles, ids and file names as `disc:0`.
   - When MakeMKV says "Failed to open disc", the window waits 15 s and runs the same scan or title again, up to 3 tries in all, and logs each try. Only then is the title counted as failed. Stop works while it waits.
-- **Tested:** unit tests (62). Offscreen with a fake `makemkvcon`: a title that fails twice rips on its third try; one that keeps failing is reported after 3 tries; the commands use `dev:`. Not yet tried with two real discs, so it isn't proven that `dev:` alone stops the failures; the retries are there in case it doesn't.
+- **Tested:** unit tests (61). Offscreen with a fake `makemkvcon`: a title that fails twice rips on its third try; one that keeps failing is reported after 3 tries; the commands use `dev:`. Not yet tried with two real discs, so it isn't proven that `dev:` alone stops the failures; the retries are there in case it doesn't.
 
 ## Open items / ideas not done
 - **Whether the all-tracks profile rips every language** was confirmed on real rips (29/27 tracks). Removing tracks after a real multi-language rip has only been tested on short titles.

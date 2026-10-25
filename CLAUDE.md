@@ -8,7 +8,7 @@ For the history of how and why things were built, see `docs/DEVELOPMENT_LOG.md`.
 
 ```sh
 ./run.sh [folder]          # the app
-python3 -m unittest        # unit tests (tests/, ~62), no GUI or network needed
+python3 -m unittest        # unit tests (tests/, ~61), no GUI or network needed
 ```
 - **System packages:** `pyside6 mpv python-mpv mkvtoolnix-cli rsync`, plus `makemkv` for ripping. No pip or virtualenv.
 - **Scope of the unit tests:** they cover the pure modules. The GUI was checked with throwaway scripts (not in the repo) that drive `MainWindow` directly. For those, set `XDG_CONFIG_HOME=<scratch>` so the user's real settings stay untouched.
