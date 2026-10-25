@@ -170,6 +170,12 @@ How Video Renamer was built. It was developed with Claude Code in one long sessi
   - If `bwrap` isn't installed, or prints an error of its own, the window runs MakeMKV the old way (after a failed bwrap it retries that step without it). Not used in the Flatpak, where bwrap can't run inside the sandbox.
 - **Tested:** unit tests (62). A real drive listing in the sandbox saw only the Sinners drive and took 6.5 s, while a normal listing was taking about 2 minutes. Offscreen with fake tools: the scan and rips saw only `/dev/sr1` and `/dev/sg2`; a failing bwrap fell back and still ripped; Stop ended both bwrap and the program. Not yet a full real rip on two drives.
 
+## 26. Export progress bar didn't move (2026-10-25)
+- **Problem:** during an export the bar and the "Copying… X of Y" text stayed put until the copy ended.
+- **Cause:** rsync 3.5.1 writes a `B` after the byte count (`24,117,248B 100% …`), so `parse_rsync_progress` matched no line. Copying and verification were unaffected.
+- **Built:** the pattern accepts an optional `B`; a test covers the new line format.
+- **Tested:** unit tests (62); a real rsync run of a test folder with the app's arguments, whose progress lines now parse.
+
 ## Open items / ideas not done
 - **Whether the all-tracks profile rips every language** was confirmed on real rips (29/27 tracks). Removing tracks after a real multi-language rip has only been tested on short titles.
 - **The first two real rips (Indiana Jones, One Battle After Another)** still contain all their tracks; they were made before the matching fix.

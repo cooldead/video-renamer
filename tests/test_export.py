@@ -11,6 +11,9 @@ class ExportTest(unittest.TestCase):
         p = export.parse_rsync_progress("  1,234,567,890  45%  110.21MB/s    0:00:10 (xfr#1, to-chk=3/5)")
         self.assertEqual((p.bytes_done, p.percent, p.speed, p.eta), (1234567890, 45, "110.21MB/s", "0:00:10"))
         self.assertEqual(export.parse_rsync_progress("          2.50G  12%   80.00MB/s    0:04:00").bytes_done, int(2.5 * 1024 ** 3))
+        # rsync 3.5.1 writes a B after the byte count.
+        p = export.parse_rsync_progress("     24,117,248B 100% 1,720,320,000B/s    0:00:00 (xfr#2, to-chk=0/4)")
+        self.assertEqual((p.bytes_done, p.percent, p.eta), (24117248, 100, "0:00:00"))
         self.assertIsNone(export.parse_rsync_progress("sending incremental file list"))
 
     def test_verify_and_real_rsync(self):

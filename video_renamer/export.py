@@ -34,7 +34,7 @@ class RsyncProgress:
     eta: str
 
 
-_PROGRESS_RE = re.compile(r"^\s*([\d,.]+)([KMGT]?)\s+(\d+)%\s+(\S+)\s+(\d+:\d{2}:\d{2})")
+_PROGRESS_RE = re.compile(r"^\s*([\d,.]+)([KMGT]?)B?\s+(\d+)%\s+(\S+)\s+(\d+:\d{2}:\d{2})")
 
 
 def parse_rsync_progress(line: str) -> RsyncProgress | None:
