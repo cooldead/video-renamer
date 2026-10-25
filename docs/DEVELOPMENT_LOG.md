@@ -176,6 +176,9 @@ How Video Renamer was built. It was developed with Claude Code in one long sessi
 - **Built:** the pattern accepts an optional `B`; a test covers the new line format.
 - **Tested:** unit tests (62); a real rsync run of a test folder with the app's arguments, whose progress lines now parse.
 
+## 27. Release v1.4.0 (2026-10-25)
+- Released as v1.4.0: TheDiscDB links (22), discs that are still loading or unmounted (23), drives opened by device path with retries (24), one drive per MakeMKV run (25), and the export progress fix (26).
+
 ## Open items / ideas not done
 - **Whether the all-tracks profile rips every language** was confirmed on real rips (29/27 tracks). Removing tracks after a real multi-language rip has only been tested on short titles.
 - **The first two real rips (Indiana Jones, One Battle After Another)** still contain all their tracks; they were made before the matching fix.

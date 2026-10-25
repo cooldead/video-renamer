@@ -28,6 +28,9 @@
   <url type="bugtracker">https://github.com/cooldead/video-renamer/issues</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.4.0" date="2026-10-25">
+      <description><p>TheDiscDB links in the Match window, more reliable ripping with two drives, and a working export progress bar with rsync 3.5.1.</p></description>
+    </release>
     <release version="1.3.0" date="2026-09-27">
       <description><p>Packages for pacman and Flatpak, and an app icon.</p></description>
     </release>
